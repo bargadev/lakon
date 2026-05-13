@@ -66,10 +66,12 @@ lakon install
 
 That's it. `lakon install` auto-detects which AI tools you have (Claude Code, Codex, Cursor, Windsurf, Cline, Gemini CLI) and configures each. From the next session forward your agent:
 
-1. Responds tersely — no preamble, no restating, no recap.
-2. Prefixes shell commands with `lakon` automatically, so output gets filtered before it reaches the model.
+1. **Responds tersely** — no preamble, no restating, no recap. (rule in CLAUDE.md / equivalent)
+2. **Has its `Bash` calls auto-rewritten** to use the filter — for Claude Code, a `PreToolUse` hook intercepts `git`/`ls`/`cat`/`grep`/etc and prefixes them with `lakon` transparently, so the model doesn't have to remember.
 
 You'll see savings stack up immediately in `lakon gain`.
+
+> The hook is currently Claude Code-only (it's the only platform with a documented `PreToolUse` API). For Codex/Cursor/Windsurf/Cline/Gemini, the rule asks the model to use the `lakon` prefix itself.
 
 > **Worried?** Every install backs up the target file first. `lakon revert` puts it back byte-for-byte.
 
@@ -165,14 +167,14 @@ Unsupported commands run unchanged (passthrough), still tracked at 0 % savings.
 
 ## Supported AI agents
 
-| Agent        | What `lakon install` writes                               |
-|--------------|-----------------------------------------------------------|
-| Claude Code  | Block in `~/.claude/CLAUDE.md`                            |
-| Codex CLI    | Block in `~/.codex/AGENTS.md`                             |
-| Cursor       | `.cursor/rules/lakon.mdc` in the current repo             |
-| Windsurf     | `.windsurf/rules/lakon.md` in the current repo            |
-| Cline        | `.clinerules/lakon.md` in the current repo                |
-| Gemini CLI   | Block in `~/.gemini/GEMINI.md`                            |
+| Agent        | What `lakon install` writes                                                                          |
+|--------------|------------------------------------------------------------------------------------------------------|
+| Claude Code  | Block in `~/.claude/CLAUDE.md` + `PreToolUse` hook in `~/.claude/settings.json` (auto-rewrites Bash) |
+| Codex CLI    | Block in `~/.codex/AGENTS.md`                                                                        |
+| Cursor       | `.cursor/rules/lakon.mdc` in the current repo                                                        |
+| Windsurf     | `.windsurf/rules/lakon.md` in the current repo                                                       |
+| Cline        | `.clinerules/lakon.md` in the current repo                                                           |
+| Gemini CLI   | Block in `~/.gemini/GEMINI.md`                                                                       |
 
 Each install is **idempotent** (rerunning replaces the existing block) and **reversible** (`uninstall` strips it, `revert` restores from backup).
 

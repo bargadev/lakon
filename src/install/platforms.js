@@ -2,7 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { backupFile, restoreBackup } = require('./backup');
+const { backupFile, restoreAllBackups } = require('./backup');
+const { installHook, uninstallHook } = require('./claude-hook');
 
 const MARK_BEGIN = '<!-- lakon:begin -->';
 const MARK_END = '<!-- lakon:end -->';
@@ -55,7 +56,7 @@ function stripBlock(filePath) {
 }
 
 function revertPlatform(platformId) {
-  return restoreBackup(platformId);
+  return restoreAllBackups(platformId);
 }
 
 const PLATFORMS = [
@@ -63,8 +64,17 @@ const PLATFORMS = [
     id: 'claude-code',
     label: 'Claude Code',
     detect: (home) => dirExists(path.join(home, '.claude')),
-    install: ({ home, rule, id }) => upsertBlock(id, path.join(home, '.claude', 'CLAUDE.md'), rule),
-    uninstall: ({ home }) => stripBlock(path.join(home, '.claude', 'CLAUDE.md')),
+    install: ({ home, rule, id }) => {
+      const rulePath = upsertBlock(id, path.join(home, '.claude', 'CLAUDE.md'), rule);
+      const hookResult = installHook(home);
+      return hookResult.settingsMerged
+        ? `${rulePath} + PreToolUse hook`
+        : `${rulePath} (hook: ${hookResult.note})`;
+    },
+    uninstall: ({ home }) => {
+      uninstallHook(home);
+      return stripBlock(path.join(home, '.claude', 'CLAUDE.md'));
+    },
   },
   {
     id: 'codex',

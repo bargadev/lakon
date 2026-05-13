@@ -66,10 +66,12 @@ async function revert({ only } = {}) {
 
   let any = false;
   for (const p of targets) {
-    const entry = platforms.revertPlatform(p.id);
-    if (entry) {
-      const when = new Date(entry.ts).toISOString().replace('T', ' ').slice(0, 19);
-      process.stdout.write(`restored:  ${p.label} → ${entry.source}\n           (from backup taken ${when})\n`);
+    const entries = platforms.revertPlatform(p.id);
+    if (entries && entries.length) {
+      for (const entry of entries) {
+        const when = new Date(entry.ts).toISOString().replace('T', ' ').slice(0, 19);
+        process.stdout.write(`restored:  ${p.label} → ${entry.source}\n           (from backup taken ${when})\n`);
+      }
       any = true;
     }
   }
