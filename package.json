@@ -1,0 +1,49 @@
+{
+  "name": "lakon",
+  "version": "0.1.0",
+  "description": "Spartan replies for AI agents — terse model output + filtered CLI output for Claude Code, Codex, Cursor, Windsurf, Cline, and Gemini.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "codex",
+    "cursor",
+    "windsurf",
+    "cline",
+    "gemini",
+    "llm",
+    "tokens",
+    "context-window",
+    "ai-coding",
+    "agent"
+  ],
+  "license": "MIT",
+  "author": "bargadev",
+  "homepage": "https://github.com/bargadev/lakon",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bargadev/lakon.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bargadev/lakon/issues"
+  },
+  "type": "commonjs",
+  "main": "src/filters/index.js",
+  "bin": {
+    "lakon": "bin/lakon.js",
+    "lak": "bin/lakon.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "assets/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}
