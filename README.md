@@ -67,6 +67,8 @@ Your AI coding agent does. It opens with *"Sure! I'd be happy to help…"*, repe
 | **Output** (the model)         | *"Great question! Let me explain…"*                   | Installing a terse-response rule. No preamble, no recap, no restating.              |
 | **Input** (your shell tools)   | `git log` dumping 1.8 k tokens of author metadata     | Wrapping `git`/`ls`/`grep`/`cat`/`tree`/`head`/`tail` and compressing before context. |
 | **Reads** (file ingestion)     | Agent runs `Read` on `pnpm-lock.yaml` → 80 k of nothing | A `PreToolUse` hook on `Read` blocks lockfiles & `node_modules`, caps files >800 lines. |
+| **Search** (Grep tool)         | `Grep` returns 800 matches and you re-read every one  | A `PreToolUse` hook on `Grep` auto-caps `head_limit` at 30 with a one-shot hint.        |
+| **Analysis** (the rule)        | `Read` 5k of logs to count errors in your head        | "Think in code" — write `node -e '…filter…count'`, consume only the answer.            |
 
 Other tools stop at one front. lakon does all three transparently — your agent doesn't have to remember anything.
 
@@ -84,6 +86,8 @@ That's it. `lakon install` auto-detects which AI tools you have (Claude Code, Co
 1. **Responds tersely** — no preamble, no restating, no recap. (rule in `CLAUDE.md` / equivalent)
 2. **Has its `Bash` calls auto-rewritten** — `PreToolUse` hook intercepts `git`/`ls`/`cat`/`grep`/etc and prefixes them with `lakon` transparently.
 3. **Has its `Read` calls guarded** — a second hook denies `node_modules/`, lockfiles, and build artifacts (with a hint to `grep` instead), and auto-caps reads over 800 lines.
+4. **Has its `Grep` calls capped** — a third hook auto-sets `head_limit` to 30 if you didn't, with a once-per-session hint to use `output_mode:"count"` for tallies.
+5. **Is told to "think in code"** — for any count/filter/parse task, the rule pushes the agent toward a one-shot `node -e` (or `awk`) script that consumes the data so the agent consumes only the answer.
 
 You'll see savings stack up immediately in `lakon gain`.
 

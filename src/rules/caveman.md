@@ -68,10 +68,36 @@ Reading entire files is the single biggest token sink. Before using `Read` on an
 
 1. **Don't Read what you don't need.** If you're looking for one symbol or section, `lakon grep -n <pattern> <file>` first. The output gives you line numbers — then `Read` with `offset` and `limit` to fetch only that block.
 2. **Never Read these — grep them or skip:**
-   - `node_modules/**`, `vendor/**`, `dist/**`, `build/**`, `.next/**`, `.turbo/**`, `coverage/**`
-   - Lockfiles: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `*.lock`
-   - Build artifacts: `*.tsbuildinfo`, `*.min.js`, `*.min.css`, source maps, log files
+   - `node_modules/**`, `vendor/**`, `dist/**`, `build/**`, `target/**`, `.next/**`, `.turbo/**`, `coverage/**`
+   - Lockfiles: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `go.sum`, `*.lock`
+   - Build artifacts: `*.tsbuildinfo`, `*.min.js`, `*.min.css`, source maps, log files, `*.pyc`, `*.so`, `*.class`
 3. **For files > 300 lines:** start with `lakon grep -n` to locate, then `Read` a slice. Don't `Read` a 2000-line file to find one function.
 4. **Use `Glob` to find files**, not `Read` on the directory listing.
 
 These reads cost real context. A `node_modules` peek is 50k tokens of nothing.
+
+## Think in code — for analysis, write a script, don't ingest the data
+
+When the user asks you to **count, filter, parse, compare, or extract** data:
+
+- **Don't** `Read` a 5k-line log and reason about it line by line.
+- **Don't** `Read` a JSON blob and re-summarize it in prose.
+- **Don't** `cat` a CSV and count rows in your head.
+
+**Do** write a one-shot script via `Bash` and consume only its `console.log` output:
+
+```bash
+node -e 'const fs = require("fs"); const lines = fs.readFileSync("app.log", "utf8").split("\n"); console.log(lines.filter(l => l.includes("ERROR")).length)'
+```
+
+```bash
+node -e 'const data = JSON.parse(require("fs").readFileSync("users.json", "utf8")); console.log(data.filter(u => u.role === "admin").map(u => u.email).join("\n"))'
+```
+
+```bash
+awk -F, '$3 > 100 { print $1 }' sales.csv | head -20
+```
+
+The script reads the data; you read only the answer. One script replaces ten tool calls.
+
+This applies whenever you'd otherwise pull bulky input into context just to derive something small from it.

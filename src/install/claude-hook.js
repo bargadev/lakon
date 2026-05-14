@@ -15,9 +15,18 @@ const HOOKS = [
     src: path.join(__dirname, '..', 'hooks', 'read-guard.js'),
     matcher: 'Read',
   },
+  {
+    basename: 'lakon-grep-guard.js',
+    src: path.join(__dirname, '..', 'hooks', 'grep-guard.js'),
+    matcher: 'Grep',
+  },
 ];
 
-const ALL_BASENAMES = HOOKS.map((h) => h.basename);
+const SUPPORT_FILES = [
+  { basename: 'throttle.js', src: path.join(__dirname, '..', 'hooks', 'throttle.js') },
+];
+
+const ALL_BASENAMES = [...HOOKS.map((h) => h.basename), ...SUPPORT_FILES.map((s) => s.basename)];
 
 function hookDest(home, basename) {
   return path.join(home, '.claude', 'hooks', basename);
@@ -74,6 +83,12 @@ function installHook(home) {
   }
 
   const installed = [];
+  for (const s of SUPPORT_FILES) {
+    const dest = hookDest(home, s.basename);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(s.src, dest);
+    fs.chmodSync(dest, 0o644);
+  }
   for (const h of HOOKS) {
     const dest = hookDest(home, h.basename);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -105,7 +120,7 @@ function uninstallHook(home) {
     if (fs.existsSync(settingsPath(home))) writeSettings(home, data);
   }
 
-  for (const h of HOOKS) {
+  for (const h of [...HOOKS, ...SUPPORT_FILES]) {
     const dest = hookDest(home, h.basename);
     if (fs.existsSync(dest)) {
       try { fs.unlinkSync(dest); } catch {}

@@ -34,6 +34,7 @@ const DENY_DIRS = [
   '.nuxt',
   'dist',
   'build',
+  'target',
   '.turbo',
   '.cache',
   'coverage',
@@ -42,9 +43,25 @@ const DENY_DIRS = [
   'venv',
   'vendor',
   '.git/objects',
+  '__snapshots__',
+  '.ipynb_checkpoints',
+  '.mypy_cache',
+  '.pytest_cache',
+  '.ruff_cache',
+  '.tox',
+  '.svelte-kit',
+  '.parcel-cache',
+  '.vercel',
+  'tmp',
+  'cypress/screenshots',
+  'cypress/videos',
+  'playwright-report',
+  'test-results',
+  '.idea',
+  '.vscode',
 ];
 
-const DENY_FILE_RE = /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lock(b)?|Cargo\.lock|Gemfile\.lock|composer\.lock|poetry\.lock|uv\.lock|.*\.tsbuildinfo|.*\.log|.*\.min\.(js|css)|.*\.map)$/;
+const DENY_FILE_RE = /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lock(b)?|Cargo\.lock|Gemfile\.lock|composer\.lock|poetry\.lock|uv\.lock|go\.sum|.*\.tsbuildinfo|.*\.log|.*\.min\.(js|css|mjs)|.*\.map|.*\.pyc|.*\.pyo|.*\.so|.*\.o|.*\.a|.*\.dylib|.*\.dll|.*\.exe|.*\.class|.*\.wasm)$/;
 
 const AUTO_CAP_LINES = 800;
 
