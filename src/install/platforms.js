@@ -64,6 +64,7 @@ const PLATFORMS = [
   {
     id: 'claude-code',
     label: 'Claude Code',
+    scope: 'global',
     detect: (home) => dirExists(path.join(home, '.claude')),
     install: ({ home, rule, id }) => {
       const rulePath = upsertBlock(id, path.join(home, '.claude', 'CLAUDE.md'), rule);
@@ -82,6 +83,7 @@ const PLATFORMS = [
   {
     id: 'codex',
     label: 'Codex CLI',
+    scope: 'global',
     detect: (home) => dirExists(path.join(home, '.codex')),
     install: ({ home, rule, id }) => upsertBlock(id, path.join(home, '.codex', 'AGENTS.md'), rule),
     uninstall: ({ home }) => stripBlock(path.join(home, '.codex', 'AGENTS.md')),
@@ -89,27 +91,31 @@ const PLATFORMS = [
   {
     id: 'cursor',
     label: 'Cursor (per-repo rule)',
-    detect: () => fs.existsSync(path.join(process.cwd(), '.cursor')) || true,
+    scope: 'project',
+    detect: () => fs.existsSync(path.join(process.cwd(), '.cursor')),
     install: ({ rule, id }) => upsertBlock(id, path.join(process.cwd(), '.cursor', 'rules', 'lakon.mdc'), rule),
     uninstall: () => stripBlock(path.join(process.cwd(), '.cursor', 'rules', 'lakon.mdc')),
   },
   {
     id: 'windsurf',
     label: 'Windsurf (per-repo rule)',
-    detect: () => fs.existsSync(path.join(process.cwd(), '.windsurf')) || true,
+    scope: 'project',
+    detect: () => fs.existsSync(path.join(process.cwd(), '.windsurf')),
     install: ({ rule, id }) => upsertBlock(id, path.join(process.cwd(), '.windsurf', 'rules', 'lakon.md'), rule),
     uninstall: () => stripBlock(path.join(process.cwd(), '.windsurf', 'rules', 'lakon.md')),
   },
   {
     id: 'cline',
     label: 'Cline (per-repo rule)',
-    detect: () => fs.existsSync(path.join(process.cwd(), '.clinerules')) || true,
+    scope: 'project',
+    detect: () => fs.existsSync(path.join(process.cwd(), '.clinerules')),
     install: ({ rule, id }) => upsertBlock(id, path.join(process.cwd(), '.clinerules', 'lakon.md'), rule),
     uninstall: () => stripBlock(path.join(process.cwd(), '.clinerules', 'lakon.md')),
   },
   {
     id: 'gemini',
     label: 'Gemini CLI',
+    scope: 'global',
     detect: (home) => dirExists(path.join(home, '.gemini')),
     install: ({ home, rule, id }) => upsertBlock(id, path.join(home, '.gemini', 'GEMINI.md'), rule),
     uninstall: ({ home }) => stripBlock(path.join(home, '.gemini', 'GEMINI.md')),

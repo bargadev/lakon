@@ -12,8 +12,13 @@ Usage:
   lakon <cmd> [args...]      Run <cmd> and filter its output (tracks savings)
   lak <cmd> [args...]        (short alias)
 
-  lakon install [--only <p>] Install rule + hooks for detected platforms
-                             (backs up each target file before first write)
+  lakon install              Install rule + hooks for detected GLOBAL platforms
+                             (Claude Code / Codex / Gemini — touches ~/ only)
+  lakon install --here       Same as above + per-project rules (Cursor /
+                             Windsurf / Cline) written into the current dir
+  lakon install --project    Per-project rules ONLY, in the current dir
+  lakon install --only <p>   Install just one platform by id
+                             (every install backs up the target file first)
   lakon uninstall            Strip the lakon block (keeps rest of file)
   lakon revert [--only <p>]  Restore files to pre-install state from backup
   lakon backups              Show backup history per platform
@@ -81,7 +86,9 @@ async function main() {
   if (first === 'install') {
     const onlyIdx = rest.indexOf('--only');
     const only = onlyIdx >= 0 ? rest[onlyIdx + 1] : null;
-    await install({ only });
+    const here = rest.includes('--here');
+    const projectOnly = rest.includes('--project');
+    await install({ only, here, projectOnly });
     return;
   }
   if (first === 'uninstall') {

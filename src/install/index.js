@@ -33,18 +33,35 @@ function detectPlatforms() {
   return platforms.list().filter((p) => p.detect(home));
 }
 
-async function install({ only } = {}) {
+async function install({ only, here = false, projectOnly = false } = {}) {
   const rule = readRule();
   const home = os.homedir();
-  const targets = only
-    ? platforms.list().filter((p) => p.id === only)
-    : detectPlatforms();
+  const all = platforms.list();
+
+  let targets;
+  if (only) {
+    targets = all.filter((p) => p.id === only);
+  } else if (projectOnly) {
+    targets = detectPlatforms().filter((p) => p.scope === 'project');
+    if (!targets.length) {
+      targets = all.filter((p) => p.scope === 'project');
+    }
+  } else {
+    const detected = detectPlatforms();
+    targets = detected.filter((p) => p.scope === 'global');
+    if (here) {
+      const projectTargets = all.filter((p) => p.scope === 'project');
+      targets = targets.concat(projectTargets);
+    }
+  }
 
   if (!targets.length) {
     if (only) {
       process.stdout.write(`${FAIL} unknown platform "${only}". Run \`lakon list\` to see options.\n`);
+    } else if (projectOnly) {
+      process.stdout.write(`${FAIL} no per-project platforms available (Cursor, Windsurf, Cline).\n`);
     } else {
-      process.stdout.write(`${FAIL} no supported platforms detected. Install Claude Code, Codex, Cursor, Windsurf, Cline, or Gemini CLI first.\n`);
+      process.stdout.write(`${FAIL} no supported global platforms detected. Install Claude Code, Codex, or Gemini CLI first — or run \`lakon install --here\` to write per-project rules (Cursor/Windsurf/Cline) in the current directory.\n`);
     }
     process.exitCode = 1;
     return;
@@ -64,6 +81,10 @@ async function install({ only } = {}) {
   }
 
   process.stdout.write('\n');
+  if (!only && !projectOnly && !here) {
+    process.stdout.write(`  ${BULLET} Per-project rules (Cursor/Windsurf/Cline) were skipped.\n`);
+    process.stdout.write(`    Inside a repo? Run \`lakon install --here\` to add them in the current directory.\n`);
+  }
   process.stdout.write(`  ${BULLET} \`lakon uninstall\` removes only the lakon block (keeps your other content).\n`);
   process.stdout.write(`  ${BULLET} \`lakon revert\`    restores files to pre-install state from backup.\n`);
   process.stdout.write(`  ${BULLET} \`lakon gain\`      shows how many tokens you've saved.\n`);
@@ -137,7 +158,8 @@ function listPlatforms() {
   return platforms.list().map((p) => {
     const detected = p.detect(os.homedir());
     const mark = detected ? OK : ' ';
-    return `${mark}  ${p.id.padEnd(14)} ${p.label}`;
+    const scope = p.scope === 'project' ? '[project]' : '[global] ';
+    return `${mark}  ${p.id.padEnd(14)} ${scope} ${p.label}`;
   });
 }
 

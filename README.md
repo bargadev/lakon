@@ -82,7 +82,17 @@ npm install -g @bargadev/lakon
 lakon install
 ```
 
-That's it. `lakon install` auto-detects which AI tools you have (Claude Code, Codex, Cursor, Windsurf, Cline, Gemini CLI) and configures each. From the next session forward your agent:
+That's it. `lakon install` configures your **global** agents — Claude Code, Codex, Gemini CLI — by writing rule blocks under `~/` only. It never touches your current directory by default.
+
+Working inside a repo and want **per-project** rules (Cursor, Windsurf, Cline)? Add `--here`:
+
+```bash
+cd path/to/your/repo
+lakon install --here       # globals + per-project rules in this dir
+lakon install --project    # per-project ONLY (skip globals)
+```
+
+From the next session forward your agent:
 
 1. **Responds tersely** — no preamble, no restating, no recap. (rule in `CLAUDE.md` / equivalent)
 2. **Has its `Bash` calls auto-rewritten** — `PreToolUse` hook intercepts `git`/`ls`/`cat`/`grep`/etc and prefixes them with `lakon` transparently.
@@ -157,7 +167,10 @@ saved:    85%
 
 | Command                          | What it does                                                          |
 |----------------------------------|-----------------------------------------------------------------------|
-| `lakon install [--only <p>]`     | Auto-detect agents and install the rule (with backup)                 |
+| `lakon install`                  | Install rule for detected GLOBAL agents only (no CWD writes)          |
+| `lakon install --here`           | Globals + per-project rules (Cursor/Windsurf/Cline) in current dir    |
+| `lakon install --project`        | Per-project rules only, in current dir                                |
+| `lakon install --only <p>`       | Install just one platform by id                                       |
 | `lakon uninstall`                | Strip the lakon block from each config (keeps your other content)     |
 | `lakon revert [--only <p>]`      | Restore each config to its pre-install state from backup              |
 | `lakon backups`                  | Show backup history per platform                                      |
@@ -204,16 +217,18 @@ The `Grep` hook auto-sets `head_limit` to **30** when the agent didn't pass one.
 
 ## Supported AI agents
 
-| Agent        | What `lakon install` writes                                                                          |
-|--------------|------------------------------------------------------------------------------------------------------|
-| Claude Code¹  | Rule block in `~/.claude/CLAUDE.md` + **three** `PreToolUse` hooks in `~/.claude/settings.json` (Bash rewrite + Read guard + Grep guard) |
-| Codex CLI    | Rule block in `~/.codex/AGENTS.md`                                                                   |
-| Cursor       | `.cursor/rules/lakon.mdc` in the current repo                                                        |
-| Windsurf     | `.windsurf/rules/lakon.md` in the current repo                                                       |
-| Cline        | `.clinerules/lakon.md` in the current repo                                                           |
-| Gemini CLI   | Rule block in `~/.gemini/GEMINI.md`                                                                  |
+| Agent           | Scope    | What `lakon install` writes                                                                          |
+|-----------------|----------|------------------------------------------------------------------------------------------------------|
+| Claude Code¹    | global   | Rule block in `~/.claude/CLAUDE.md` + **three** `PreToolUse` hooks in `~/.claude/settings.json` (Bash rewrite + Read guard + Grep guard) |
+| Codex CLI       | global   | Rule block in `~/.codex/AGENTS.md`                                                                   |
+| Gemini CLI      | global   | Rule block in `~/.gemini/GEMINI.md`                                                                  |
+| Cursor          | project² | `.cursor/rules/lakon.mdc` in the current dir                                                         |
+| Windsurf        | project² | `.windsurf/rules/lakon.md` in the current dir                                                        |
+| Cline           | project² | `.clinerules/lakon.md` in the current dir                                                            |
 
 ¹ "Claude Code" covers **every** Claude Code frontend — terminal CLI, VS Code extension, JetBrains plugin, desktop app. All read the same `~/.claude/CLAUDE.md` + `~/.claude/settings.json`, so one install lights up all of them.
+
+² Project-scoped tools only read rules from the current directory, so `lakon install` skips them by default to avoid scattering files across your repos. Add `--here` (or use `--project`) when you actually want them in the current dir.
 
 Each install is **idempotent** (rerunning replaces the existing block) and **reversible** (`uninstall` strips it, `revert` restores from backup).
 
