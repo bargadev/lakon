@@ -31,14 +31,15 @@
 
 | Command                          | Raw tokens | Filtered | Saved   |
 |----------------------------------|-----------:|---------:|--------:|
-| `git log -50`                    |      1,859 |      173 | **-91%** |
-| `git diff HEAD~5`                |      7,965 |    2,523 | **-68%** |
-| `ls -la` (large dir)             |        317 |       70 | **-78%** |
-| `grep -rn function src/`         |        287 |       62 | **-78%** |
-| `git status`                     |         57 |       18 | **-68%** |
-| `Read node_modules/lodash.js`    |     ~5,000 |    **blocked** | **-100%** |
+| `git log -p -10`                 |     10,497 |       78 | **-94%** |
+| `ls -laR` (deep directory)       |     23,624 |      117 | **-94%** |
+| `git diff HEAD~5`                |     13,230 |      798 | **-89%** |
+| `git log --stat -50`             |      4,845 |      439 | **-86%** |
+| `git status`                     |         17 |        1 | **-89%** |
+| `Read pnpm-lock.yaml`            |    ~56,000 | **blocked** | **-95%** |
+| `Grep` (auto `head_limit`)       |  unbounded | 30 matches | **capped** |
 
-Real numbers from this repo. Run `lakon inspect <cmd>` on your own commands.
+Conservative numbers — peaks go higher in practice. Run `lakon inspect <cmd>` on your own commands to measure.
 
 ---
 
@@ -205,12 +206,14 @@ The `Grep` hook auto-sets `head_limit` to **30** when the agent didn't pass one.
 
 | Agent        | What `lakon install` writes                                                                          |
 |--------------|------------------------------------------------------------------------------------------------------|
-| Claude Code  | Rule block in `~/.claude/CLAUDE.md` + **three** `PreToolUse` hooks in `~/.claude/settings.json` (Bash rewrite + Read guard + Grep guard) |
+| Claude Code¹  | Rule block in `~/.claude/CLAUDE.md` + **three** `PreToolUse` hooks in `~/.claude/settings.json` (Bash rewrite + Read guard + Grep guard) |
 | Codex CLI    | Rule block in `~/.codex/AGENTS.md`                                                                   |
 | Cursor       | `.cursor/rules/lakon.mdc` in the current repo                                                        |
 | Windsurf     | `.windsurf/rules/lakon.md` in the current repo                                                       |
 | Cline        | `.clinerules/lakon.md` in the current repo                                                           |
 | Gemini CLI   | Rule block in `~/.gemini/GEMINI.md`                                                                  |
+
+¹ "Claude Code" covers **every** Claude Code frontend — terminal CLI, VS Code extension, JetBrains plugin, desktop app. All read the same `~/.claude/CLAUDE.md` + `~/.claude/settings.json`, so one install lights up all of them.
 
 Each install is **idempotent** (rerunning replaces the existing block) and **reversible** (`uninstall` strips it, `revert` restores from backup).
 
