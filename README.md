@@ -188,12 +188,16 @@ Unsupported commands run unchanged (passthrough), still tracked at 0 % savings.
 
 The `Read` hook automatically:
 
-- **Denies** paths under `node_modules/`, `vendor/`, `dist/`, `build/`, `.next/`, `.turbo/`, `coverage/`, `__pycache__/`, `.venv/`, `.git/objects/`
-- **Denies** lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `*.lock`)
-- **Denies** build artifacts (`*.min.js`, `*.min.css`, `*.tsbuildinfo`, `*.map`, `*.log`)
+- **Denies** paths under `node_modules/`, `vendor/`, `dist/`, `build/`, `target/`, `.next/`, `.nuxt/`, `.turbo/`, `.svelte-kit/`, `.parcel-cache/`, `.vercel/`, `coverage/`, `__pycache__/`, `.venv/`, `.git/objects/`, `__snapshots__/`, `.ipynb_checkpoints/`, `.mypy_cache/`, `.pytest_cache/`, `.ruff_cache/`, `.tox/`, `cypress/screenshots/`, `cypress/videos/`, `playwright-report/`, `test-results/`, `.idea/`, `.vscode/`, `tmp/`
+- **Denies** lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `go.sum`, `*.lock`)
+- **Denies** build artifacts (`*.min.js`, `*.min.css`, `*.min.mjs`, `*.tsbuildinfo`, `*.map`, `*.log`, `*.pyc`, `*.pyo`, `*.so`, `*.o`, `*.a`, `*.dylib`, `*.dll`, `*.exe`, `*.class`, `*.wasm`)
 - **Caps** files over 800 lines at 800 (with hint to `Read` again with `offset` for more, or `grep -n` for the symbol you need)
 
 Each deny returns a one-line reason the model reads, so it knows to `grep -n` the symbol instead.
+
+### Grep tool guard (Claude Code)
+
+The `Grep` hook auto-sets `head_limit` to **30** when the agent didn't pass one. First call per 4-hour window includes a one-line hint suggesting `output_mode:"count"` for tallies; subsequent calls cap silently.
 
 ---
 
@@ -201,7 +205,7 @@ Each deny returns a one-line reason the model reads, so it knows to `grep -n` th
 
 | Agent        | What `lakon install` writes                                                                          |
 |--------------|------------------------------------------------------------------------------------------------------|
-| Claude Code  | Rule block in `~/.claude/CLAUDE.md` + **two** `PreToolUse` hooks in `~/.claude/settings.json` (Bash rewrite + Read guard) |
+| Claude Code  | Rule block in `~/.claude/CLAUDE.md` + **three** `PreToolUse` hooks in `~/.claude/settings.json` (Bash rewrite + Read guard + Grep guard) |
 | Codex CLI    | Rule block in `~/.codex/AGENTS.md`                                                                   |
 | Cursor       | `.cursor/rules/lakon.mdc` in the current repo                                                        |
 | Windsurf     | `.windsurf/rules/lakon.md` in the current repo                                                       |
