@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/lakon"><img src="https://img.shields.io/npm/v/lakon?color=0F0F0F&label=npm" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/@bargadev/lakon"><img src="https://img.shields.io/npm/v/@bargadev/lakon?color=0F0F0F&label=npm" alt="npm" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0F0F0F" alt="MIT" /></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A518-0F0F0F" alt="node ≥18" />
   <img src="https://img.shields.io/badge/deps-0-0F0F0F" alt="zero dependencies" />
@@ -60,7 +60,7 @@ git status              57 →   18 tokens     -68 %
 ## Quick start
 
 ```bash
-npm install -g lakon
+npm install -g @bargadev/lakon
 lakon install
 ```
 
