@@ -89,7 +89,6 @@ Working inside a repo and want **per-project** rules (Cursor, Windsurf, Cline)? 
 ```bash
 cd path/to/your/repo
 lakon install --here       # globals + per-project rules in this dir
-lakon install --project    # per-project ONLY (skip globals)
 ```
 
 From the next session forward your agent:
@@ -169,8 +168,7 @@ saved:    85%
 |----------------------------------|-----------------------------------------------------------------------|
 | `lakon install`                  | Install rule for detected GLOBAL agents only (no CWD writes)          |
 | `lakon install --here`           | Globals + per-project rules (Cursor/Windsurf/Cline) in current dir    |
-| `lakon install --project`        | Per-project rules only, in current dir                                |
-| `lakon install --only <p>`       | Install just one platform by id                                       |
+| `lakon install --only <p>`       | Install just one platform by id (any scope)                           |
 | `lakon uninstall`                | Strip the lakon block from each config (keeps your other content)     |
 | `lakon revert [--only <p>]`      | Restore each config to its pre-install state from backup              |
 | `lakon backups`                  | Show backup history per platform                                      |

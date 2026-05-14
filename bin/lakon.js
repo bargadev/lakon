@@ -16,8 +16,7 @@ Usage:
                              (Claude Code / Codex / Gemini — touches ~/ only)
   lakon install --here       Same as above + per-project rules (Cursor /
                              Windsurf / Cline) written into the current dir
-  lakon install --project    Per-project rules ONLY, in the current dir
-  lakon install --only <p>   Install just one platform by id
+  lakon install --only <p>   Install just one platform by id (any scope)
                              (every install backs up the target file first)
   lakon uninstall            Strip the lakon block (keeps rest of file)
   lakon revert [--only <p>]  Restore files to pre-install state from backup
@@ -87,8 +86,7 @@ async function main() {
     const onlyIdx = rest.indexOf('--only');
     const only = onlyIdx >= 0 ? rest[onlyIdx + 1] : null;
     const here = rest.includes('--here');
-    const projectOnly = rest.includes('--project');
-    await install({ only, here, projectOnly });
+    await install({ only, here });
     return;
   }
   if (first === 'uninstall') {
