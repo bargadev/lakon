@@ -3,22 +3,32 @@
 const fs = require('fs');
 const path = require('path');
 const { backupFile } = require('./backup');
+const { claudeConfigDir } = require('./paths');
 
 const HOOKS = [
   {
     basename: 'lakon-bash-rewrite.js',
     src: path.join(__dirname, '..', 'hooks', 'bash-rewrite.js'),
+    event: 'PreToolUse',
     matcher: 'Bash',
   },
   {
     basename: 'lakon-read-guard.js',
     src: path.join(__dirname, '..', 'hooks', 'read-guard.js'),
+    event: 'PreToolUse',
     matcher: 'Read',
   },
   {
     basename: 'lakon-grep-guard.js',
     src: path.join(__dirname, '..', 'hooks', 'grep-guard.js'),
+    event: 'PreToolUse',
     matcher: 'Grep',
+  },
+  {
+    basename: 'lakon-stop-hook.js',
+    src: path.join(__dirname, '..', 'hooks', 'stop-hook.js'),
+    event: 'Stop',
+    matcher: null,
   },
 ];
 
@@ -29,11 +39,11 @@ const SUPPORT_FILES = [
 const ALL_BASENAMES = [...HOOKS.map((h) => h.basename), ...SUPPORT_FILES.map((s) => s.basename)];
 
 function hookDest(home, basename) {
-  return path.join(home, '.claude', 'hooks', basename);
+  return path.join(claudeConfigDir(home), 'hooks', basename);
 }
 
 function settingsPath(home) {
-  return path.join(home, '.claude', 'settings.json');
+  return path.join(claudeConfigDir(home), 'settings.json');
 }
 
 function readSettings(home) {
@@ -56,20 +66,32 @@ function entryHasHook(entry, basename) {
 }
 
 function mergeHook(data, hookDef, dest) {
+  const eventKey = hookDef.event || 'PreToolUse';
   data.hooks = data.hooks || {};
-  data.hooks.PreToolUse = data.hooks.PreToolUse || [];
+  data.hooks[eventKey] = data.hooks[eventKey] || [];
 
-  const existing = data.hooks.PreToolUse.find((e) => e.matcher === hookDef.matcher);
-  if (existing) {
-    if (!entryHasHook(existing, hookDef.basename)) {
-      existing.hooks = existing.hooks || [];
-      existing.hooks.push({ type: 'command', command: dest });
+  if (hookDef.matcher) {
+    const existing = data.hooks[eventKey].find((e) => e.matcher === hookDef.matcher);
+    if (existing) {
+      if (!entryHasHook(existing, hookDef.basename)) {
+        existing.hooks = existing.hooks || [];
+        existing.hooks.push({ type: 'command', command: dest });
+      }
+    } else {
+      data.hooks[eventKey].push({
+        matcher: hookDef.matcher,
+        hooks: [{ type: 'command', command: dest }],
+      });
     }
   } else {
-    data.hooks.PreToolUse.push({
-      matcher: hookDef.matcher,
-      hooks: [{ type: 'command', command: dest }],
-    });
+    const existing = data.hooks[eventKey].find(
+      (e) => !e.matcher && entryHasHook(e, hookDef.basename)
+    );
+    if (!existing) {
+      data.hooks[eventKey].push({
+        hooks: [{ type: 'command', command: dest }],
+      });
+    }
   }
 }
 
@@ -104,19 +126,22 @@ function installHook(home) {
 
 function uninstallHook(home) {
   const { ok, data } = readSettings(home);
-  if (ok && data.hooks && Array.isArray(data.hooks.PreToolUse)) {
-    data.hooks.PreToolUse = data.hooks.PreToolUse
-      .map((entry) => {
-        if (!Array.isArray(entry.hooks)) return entry;
-        const remaining = entry.hooks.filter(
-          (h) => !(h.command && ALL_BASENAMES.some((b) => h.command.includes(b)))
-        );
-        if (remaining.length === 0) return null;
-        return { ...entry, hooks: remaining };
-      })
-      .filter(Boolean);
-    if (data.hooks.PreToolUse.length === 0) delete data.hooks.PreToolUse;
-    if (data.hooks && Object.keys(data.hooks).length === 0) delete data.hooks;
+  if (ok && data.hooks && typeof data.hooks === 'object') {
+    for (const eventKey of Object.keys(data.hooks)) {
+      if (!Array.isArray(data.hooks[eventKey])) continue;
+      data.hooks[eventKey] = data.hooks[eventKey]
+        .map((entry) => {
+          if (!Array.isArray(entry.hooks)) return entry;
+          const remaining = entry.hooks.filter(
+            (h) => !(h.command && ALL_BASENAMES.some((b) => h.command.includes(b)))
+          );
+          if (remaining.length === 0) return null;
+          return { ...entry, hooks: remaining };
+        })
+        .filter(Boolean);
+      if (data.hooks[eventKey].length === 0) delete data.hooks[eventKey];
+    }
+    if (Object.keys(data.hooks).length === 0) delete data.hooks;
     if (fs.existsSync(settingsPath(home))) writeSettings(home, data);
   }
 

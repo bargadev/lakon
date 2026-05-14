@@ -49,24 +49,50 @@ function readEntries() {
   }
 }
 
+function isSessionEntry(e) {
+  return e.cmd === 'session';
+}
+
 function aggregate(entries) {
+  const filtered = entries.filter((e) => !isSessionEntry(e));
   const sum = (xs, k) => xs.reduce((a, e) => a + (e[k] || 0), 0);
   return {
-    calls: entries.length,
-    raw: sum(entries, 'raw'),
-    out: sum(entries, 'out'),
-    saved: sum(entries, 'saved'),
+    calls: filtered.length,
+    raw: sum(filtered, 'raw'),
+    out: sum(filtered, 'out'),
+    saved: sum(filtered, 'saved'),
   };
 }
 
-function byWindow(entries, ms) {
+function aggregateSessions(entries) {
+  const sessions = entries.filter(isSessionEntry);
+  const sum = (k) => sessions.reduce((a, e) => a + (e[k] || 0), 0);
+  return {
+    turns: sessions.length,
+    in_tokens: sum('in_tokens'),
+    out_tokens: sum('out_tokens'),
+    cache_read: sum('cache_read'),
+  };
+}
+
+function inWindow(entries, ms) {
+  if (ms === Infinity) return entries;
   const cutoff = Date.now() - ms;
-  return aggregate(entries.filter((e) => e.t >= cutoff));
+  return entries.filter((e) => e.t >= cutoff);
+}
+
+function byWindow(entries, ms) {
+  return aggregate(inWindow(entries, ms));
+}
+
+function byWindowSessions(entries, ms) {
+  return aggregateSessions(inWindow(entries, ms));
 }
 
 function byCommand(entries) {
   const map = new Map();
   for (const e of entries) {
+    if (isSessionEntry(e)) continue;
     const k = e.cmd || 'unknown';
     if (!map.has(k)) map.set(k, { cmd: k, calls: 0, raw: 0, out: 0, saved: 0 });
     const acc = map.get(k);
@@ -93,25 +119,28 @@ function tok(n) {
   return fmt(n) + ' tok';
 }
 
+const WINDOW_LABELS = [
+  ['last hour ', HOUR_MS],
+  ['last 24h  ', DAY_MS],
+  ['last 7d   ', WEEK_MS],
+  ['last 30d  ', 30 * DAY_MS],
+  ['all time  ', Infinity],
+];
+
 function report() {
   const entries = readEntries();
   if (!entries.length) {
     return 'lakon: no usage recorded yet. Run a few commands through `lakon` first.\n';
   }
-  const buckets = [
-    ['last hour ', byWindow(entries, HOUR_MS)],
-    ['last 24h  ', byWindow(entries, DAY_MS)],
-    ['last 7d   ', byWindow(entries, WEEK_MS)],
-    ['last 30d  ', byWindow(entries, 30 * DAY_MS)],
-    ['all time  ', aggregate(entries)],
-  ];
 
   const lines = [];
   lines.push('lakon — savings report');
   lines.push('───────────────────────────────────────────────────────────');
+  lines.push('shell + read/grep guards (tokens filtered before context):');
   lines.push('window      calls    before       after        saved       %');
   lines.push('───────────────────────────────────────────────────────────');
-  for (const [label, agg] of buckets) {
+  for (const [label, ms] of WINDOW_LABELS) {
+    const agg = byWindow(entries, ms);
     const row =
       `${label}` +
       `${String(agg.calls).padStart(6)}  ` +
@@ -122,6 +151,26 @@ function report() {
     lines.push(row);
   }
   lines.push('───────────────────────────────────────────────────────────');
+
+  const sessionsAll = aggregateSessions(entries);
+  if (sessionsAll.turns > 0) {
+    lines.push('');
+    lines.push('session output (LLM tokens — terse style trims this side):');
+    lines.push('───────────────────────────────────────────────────────────');
+    lines.push('window      turns    input        output       cache-read');
+    lines.push('───────────────────────────────────────────────────────────');
+    for (const [label, ms] of WINDOW_LABELS) {
+      const agg = byWindowSessions(entries, ms);
+      const row =
+        `${label}` +
+        `${String(agg.turns).padStart(6)}  ` +
+        `${tok(agg.in_tokens).padStart(10)}  ` +
+        `${tok(agg.out_tokens).padStart(10)}   ` +
+        `${tok(agg.cache_read).padStart(10)}`;
+      lines.push(row);
+    }
+    lines.push('───────────────────────────────────────────────────────────');
+  }
 
   const top = byCommand(entries).slice(0, 5);
   if (top.length) {

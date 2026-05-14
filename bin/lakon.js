@@ -30,6 +30,10 @@ Usage:
 
 Supported filters: git (log/status/diff/show), ls, tree, cat, head, tail, grep, rg, ag.
 Unsupported commands run unchanged (passthrough, still tracked as 0% savings).
+
+Multi-profile Claude Code (e.g. claude-my / claude-arco wrappers):
+  CLAUDE_CONFIG_DIR=$HOME/.claude-my   lakon install
+  CLAUDE_CONFIG_DIR=$HOME/.claude-arco lakon install
 `;
 
 function runAndFilter(cmd, args) {

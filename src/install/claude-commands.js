@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { claudeConfigDir } = require('./paths');
 
 const COMMANDS = [
   {
@@ -38,7 +39,7 @@ Run \`lakon inspect $ARGUMENTS\` and show the output verbatim.
 ];
 
 function commandsDir(home) {
-  return path.join(home, '.claude', 'commands', 'lakon');
+  return path.join(claudeConfigDir(home), 'commands', 'lakon');
 }
 
 function installCommands(home) {

@@ -5,6 +5,7 @@ const path = require('path');
 const { backupFile, restoreAllBackups } = require('./backup');
 const { installHook, uninstallHook } = require('./claude-hook');
 const { installCommands, uninstallCommands } = require('./claude-commands');
+const { claudeConfigDir } = require('./paths');
 
 const MARK_BEGIN = '<!-- lakon:begin -->';
 const MARK_END = '<!-- lakon:end -->';
@@ -65,9 +66,9 @@ const PLATFORMS = [
     id: 'claude-code',
     label: 'Claude Code',
     scope: 'global',
-    detect: (home) => dirExists(path.join(home, '.claude')),
+    detect: (home) => !!process.env.CLAUDE_CONFIG_DIR || dirExists(claudeConfigDir(home)),
     install: ({ home, rule, id }) => {
-      const rulePath = upsertBlock(id, path.join(home, '.claude', 'CLAUDE.md'), rule);
+      const rulePath = upsertBlock(id, path.join(claudeConfigDir(home), 'CLAUDE.md'), rule);
       const hookResult = installHook(home);
       const cmds = installCommands(home);
       const suffixHook = hookResult.settingsMerged ? '+ PreToolUse hook' : `(hook: ${hookResult.note})`;
@@ -77,7 +78,7 @@ const PLATFORMS = [
     uninstall: ({ home }) => {
       uninstallHook(home);
       uninstallCommands(home);
-      return stripBlock(path.join(home, '.claude', 'CLAUDE.md'));
+      return stripBlock(path.join(claudeConfigDir(home), 'CLAUDE.md'));
     },
   },
   {
