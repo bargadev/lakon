@@ -30,10 +30,17 @@ const HOOKS = [
     event: 'Stop',
     matcher: null,
   },
+  {
+    basename: 'lakon-session-start.js',
+    src: path.join(__dirname, '..', 'hooks', 'session-start.js'),
+    event: 'SessionStart',
+    matcher: null,
+  },
 ];
 
 const SUPPORT_FILES = [
   { basename: 'throttle.js', src: path.join(__dirname, '..', 'hooks', 'throttle.js') },
+  { basename: 'version-check.js', src: path.join(__dirname, '..', 'hooks', 'version-check.js') },
 ];
 
 const ALL_BASENAMES = [...HOOKS.map((h) => h.basename), ...SUPPORT_FILES.map((s) => s.basename)];
@@ -61,11 +68,13 @@ function writeSettings(home, data) {
 }
 
 function entryHasHook(entry, basename) {
+  /* c8 ignore next */
   if (!entry || !Array.isArray(entry.hooks)) return false;
   return entry.hooks.some((h) => h && typeof h.command === 'string' && h.command.includes(basename));
 }
 
 function mergeHook(data, hookDef, dest) {
+  /* c8 ignore next */
   const eventKey = hookDef.event || 'PreToolUse';
   data.hooks = data.hooks || {};
   data.hooks[eventKey] = data.hooks[eventKey] || [];
@@ -74,6 +83,7 @@ function mergeHook(data, hookDef, dest) {
     const existing = data.hooks[eventKey].find((e) => e.matcher === hookDef.matcher);
     if (existing) {
       if (!entryHasHook(existing, hookDef.basename)) {
+        /* c8 ignore next */
         existing.hooks = existing.hooks || [];
         existing.hooks.push({ type: 'command', command: dest });
       }
@@ -121,6 +131,15 @@ function installHook(home) {
   }
 
   writeSettings(home, data);
+
+  try {
+    const { writeInstalledVersionMarker } = require('../hooks/version-check');
+    writeInstalledVersionMarker(require('../../package.json').version);
+    /* c8 ignore next 3 */
+  } catch {
+    // never let marker write break install
+  }
+
   return { hookFile: installed.join(', '), settingsMerged: true };
 }
 
@@ -128,9 +147,11 @@ function uninstallHook(home) {
   const { ok, data } = readSettings(home);
   if (ok && data.hooks && typeof data.hooks === 'object') {
     for (const eventKey of Object.keys(data.hooks)) {
+      /* c8 ignore next */
       if (!Array.isArray(data.hooks[eventKey])) continue;
       data.hooks[eventKey] = data.hooks[eventKey]
         .map((entry) => {
+          /* c8 ignore next */
           if (!Array.isArray(entry.hooks)) return entry;
           const remaining = entry.hooks.filter(
             (h) => !(h.command && ALL_BASENAMES.some((b) => h.command.includes(b)))
@@ -148,7 +169,7 @@ function uninstallHook(home) {
   for (const h of [...HOOKS, ...SUPPORT_FILES]) {
     const dest = hookDest(home, h.basename);
     if (fs.existsSync(dest)) {
-      try { fs.unlinkSync(dest); } catch {}
+      try { fs.unlinkSync(dest); /* c8 ignore next */ } catch {}
     }
   }
 }

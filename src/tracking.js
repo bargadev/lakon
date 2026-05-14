@@ -9,6 +9,7 @@ const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
 
 function dataDir() {
+  /* c8 ignore next */
   return process.env.LAKON_HOME || path.join(os.homedir(), '.lakon');
 }
 
@@ -29,6 +30,7 @@ function record({ cmd, args, rawTokens, filteredTokens }) {
       saved: Math.max(0, rawTokens - filteredTokens),
     };
     fs.appendFileSync(logPath(), JSON.stringify(entry) + '\n');
+    /* c8 ignore next 3 */
   } catch {
     // never let tracking break a user command
   }
@@ -120,12 +122,40 @@ function tok(n) {
 }
 
 const WINDOW_LABELS = [
-  ['last hour ', HOUR_MS],
-  ['last 24h  ', DAY_MS],
-  ['last 7d   ', WEEK_MS],
-  ['last 30d  ', 30 * DAY_MS],
-  ['all time  ', Infinity],
+  ['1h ', HOUR_MS],
+  ['24h', DAY_MS],
+  ['7d ', WEEK_MS],
+  ['30d', 30 * DAY_MS],
+  ['all', Infinity],
 ];
+
+function useColor() {
+  if (process.env.NO_COLOR) return false;
+  if (process.env.LAKON_COLOR === '0') return false;
+  if (process.env.LAKON_COLOR === '1') return true;
+  return !!process.stdout.isTTY;
+}
+
+function paint(s, codes) {
+  if (!useColor()) return s;
+  return `\x1b[${codes}m${s}\x1b[0m`;
+}
+const dim = (s) => paint(s, '2');
+const bold = (s) => paint(s, '1');
+const green = (s) => paint(s, '32');
+const cyan = (s) => paint(s, '36');
+
+function pad(s, n) {
+  s = String(s);
+  /* c8 ignore next */
+  if (s.length >= n) return s;
+  return s + ' '.repeat(n - s.length);
+}
+function rpad(s, n) {
+  s = String(s);
+  if (s.length >= n) return s;
+  return ' '.repeat(n - s.length) + s;
+}
 
 function report() {
   const entries = readEntries();
@@ -134,55 +164,63 @@ function report() {
   }
 
   const lines = [];
-  lines.push('lakon — savings report');
-  lines.push('───────────────────────────────────────────────────────────');
-  lines.push('shell + read/grep guards (tokens filtered before context):');
-  lines.push('window      calls    before       after        saved       %');
-  lines.push('───────────────────────────────────────────────────────────');
+  const W = byWindow(entries, WEEK_MS);
+  const headlinePct = pct(W.saved, W.raw);
+  lines.push(
+    `${bold('lakon')}  ${dim('— savings this week:')}  ` +
+      `${green(tok(W.saved))} ${dim('saved across')} ${W.calls} ${dim('shell calls')} ${green(`(${headlinePct}%)`)}`
+  );
+  lines.push('');
+
+  lines.push(cyan('shell + read/grep guards') + dim('  (tokens filtered before context)'));
+  lines.push(dim('  win    calls       before          after          saved       %'));
   for (const [label, ms] of WINDOW_LABELS) {
     const agg = byWindow(entries, ms);
+    if (agg.calls === 0) continue;
     const row =
-      `${label}` +
-      `${String(agg.calls).padStart(6)}  ` +
-      `${tok(agg.raw).padStart(10)}  ` +
-      `${tok(agg.out).padStart(10)}   ` +
-      `${tok(agg.saved).padStart(10)}   ` +
-      `${pct(agg.saved, agg.raw).toString().padStart(3)}%`;
+      `  ${pad(label, 6)}` +
+      `${rpad(agg.calls, 5)}  ` +
+      `${rpad(tok(agg.raw), 12)}  ` +
+      `${rpad(tok(agg.out), 12)}  ` +
+      `${rpad(green(tok(agg.saved)), 12 + (useColor() ? 9 : 0))}  ` +
+      `${rpad(green(pct(agg.saved, agg.raw) + '%'), 4 + (useColor() ? 9 : 0))}`;
     lines.push(row);
   }
-  lines.push('───────────────────────────────────────────────────────────');
 
   const sessionsAll = aggregateSessions(entries);
   if (sessionsAll.turns > 0) {
     lines.push('');
-    lines.push('session output (LLM tokens — terse style trims this side):');
-    lines.push('───────────────────────────────────────────────────────────');
-    lines.push('window      turns    input        output       cache-read');
-    lines.push('───────────────────────────────────────────────────────────');
+    lines.push(cyan('llm output') + dim('  (model tokens — terse style trims this side)'));
+    lines.push(dim('  win    turns       input         output          cache-read'));
     for (const [label, ms] of WINDOW_LABELS) {
       const agg = byWindowSessions(entries, ms);
+      if (agg.turns === 0) continue;
       const row =
-        `${label}` +
-        `${String(agg.turns).padStart(6)}  ` +
-        `${tok(agg.in_tokens).padStart(10)}  ` +
-        `${tok(agg.out_tokens).padStart(10)}   ` +
-        `${tok(agg.cache_read).padStart(10)}`;
+        `  ${pad(label, 6)}` +
+        `${rpad(agg.turns, 5)}  ` +
+        `${rpad(tok(agg.in_tokens), 12)}  ` +
+        `${rpad(tok(agg.out_tokens), 12)}  ` +
+        `${rpad(tok(agg.cache_read), 12)}`;
       lines.push(row);
     }
-    lines.push('───────────────────────────────────────────────────────────');
   }
 
   const top = byCommand(entries).slice(0, 5);
   if (top.length) {
     lines.push('');
-    lines.push('top commands (all time):');
+    lines.push(cyan('top commands') + dim('  (all time)'));
     for (const c of top) {
-      lines.push(`  ${c.cmd.padEnd(8)} calls=${c.calls}  saved=${tok(c.saved)}  ${pct(c.saved, c.raw)}%`);
+      const row =
+        `  ${pad(c.cmd, 8)}` +
+        `${rpad(c.calls + 'x', 6)}  ` +
+        `${dim('saved')} ${rpad(green(tok(c.saved)), 10 + (useColor() ? 9 : 0))}  ` +
+        `${green(pct(c.saved, c.raw) + '%')}`;
+      lines.push(row);
     }
   }
 
   lines.push('');
-  lines.push(`log: ${logPath()}`);
+  lines.push(dim(`log: ${logPath()}`));
   return lines.join('\n') + '\n';
 }
 

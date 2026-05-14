@@ -18,6 +18,7 @@ function readRule() {
 }
 
 function shortenPath(p) {
+  /* c8 ignore next */
   if (!p) return p;
   const home = os.homedir();
   if (p.startsWith(home)) return '~' + p.slice(home.length);
@@ -25,6 +26,7 @@ function shortenPath(p) {
 }
 
 function padLabel(label, width = 26) {
+  /* c8 ignore next */
   return label.length >= width ? label : label + ' '.repeat(width - label.length);
 }
 

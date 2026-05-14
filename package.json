@@ -1,6 +1,6 @@
 {
   "name": "@bargadev/lakon",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Spartan replies for AI agents — terse model output + filtered CLI output for Claude Code, Codex, Cursor, Windsurf, Cline, and Gemini.",
   "keywords": [
     "claude",
@@ -40,10 +40,14 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test tests/"
+    "test": "node --test tests/",
+    "test:coverage": "c8 --reporter=text --reporter=html node --test tests/",
+    "test:coverage:check": "c8 --check-coverage --lines 100 --branches 100 --functions 100 node --test tests/"
   },
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {}
+  "devDependencies": {
+    "c8": "^11.0.0"
+  }
 }

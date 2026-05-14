@@ -84,6 +84,90 @@ test('isolation: two CLAUDE_CONFIG_DIRs produce independent installs', () => {
   assert.ok(!fs.existsSync(path.join(home, '.claude')));
 });
 
+test('installHook returns parse-error note when settings.json is malformed', () => {
+  const home = freshHome();
+  const cfgDir = path.join(home, '.claude-bad');
+  fs.mkdirSync(cfgDir, { recursive: true });
+  fs.writeFileSync(path.join(cfgDir, 'settings.json'), '{ not valid json');
+  withEnv('CLAUDE_CONFIG_DIR', cfgDir, () => {
+    const { installHook } = freshRequire('../src/install/claude-hook');
+    const result = installHook(home);
+    assert.equal(result.settingsMerged, false);
+    assert.match(result.note, /could not be parsed/);
+  });
+});
+
+test('installHook merges into existing matcher entry without duplicating', () => {
+  const home = freshHome();
+  const cfgDir = path.join(home, '.claude-prior');
+  fs.mkdirSync(cfgDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(cfgDir, 'settings.json'),
+    JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash',
+            hooks: [{ type: 'command', command: '/some/user/hook.sh' }],
+          },
+        ],
+      },
+    })
+  );
+  withEnv('CLAUDE_CONFIG_DIR', cfgDir, () => {
+    const { installHook } = freshRequire('../src/install/claude-hook');
+    installHook(home);
+    const settings = JSON.parse(fs.readFileSync(path.join(cfgDir, 'settings.json'), 'utf8'));
+    const bashEntry = settings.hooks.PreToolUse.find((e) => e.matcher === 'Bash');
+    assert.equal(bashEntry.hooks.length, 2);
+    assert.ok(bashEntry.hooks.some((h) => h.command.includes('lakon-bash-rewrite')));
+    assert.ok(bashEntry.hooks.some((h) => h.command === '/some/user/hook.sh'));
+  });
+});
+
+test('uninstallHook preserves sibling hooks in same matcher', () => {
+  const home = freshHome();
+  const cfgDir = path.join(home, '.claude-sibling');
+  fs.mkdirSync(cfgDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(cfgDir, 'settings.json'),
+    JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash',
+            hooks: [{ type: 'command', command: '/user/own-hook.sh' }],
+          },
+        ],
+      },
+    })
+  );
+  withEnv('CLAUDE_CONFIG_DIR', cfgDir, () => {
+    const { installHook, uninstallHook } = freshRequire('../src/install/claude-hook');
+    installHook(home);
+    uninstallHook(home);
+    const settings = JSON.parse(fs.readFileSync(path.join(cfgDir, 'settings.json'), 'utf8'));
+    const bashEntry = settings.hooks.PreToolUse.find((e) => e.matcher === 'Bash');
+    assert.ok(bashEntry, 'Bash matcher should still exist');
+    assert.equal(bashEntry.hooks.length, 1);
+    assert.equal(bashEntry.hooks[0].command, '/user/own-hook.sh');
+  });
+});
+
+test('installHook is idempotent — second run does not duplicate entries', () => {
+  const home = freshHome();
+  const cfgDir = path.join(home, '.claude-idem');
+  withEnv('CLAUDE_CONFIG_DIR', cfgDir, () => {
+    const { installHook } = freshRequire('../src/install/claude-hook');
+    installHook(home);
+    installHook(home);
+    const settings = JSON.parse(fs.readFileSync(path.join(cfgDir, 'settings.json'), 'utf8'));
+    const bashHooks = settings.hooks.PreToolUse.find((e) => e.matcher === 'Bash').hooks;
+    const lakonCount = bashHooks.filter((h) => h.command.includes('lakon-bash-rewrite')).length;
+    assert.equal(lakonCount, 1);
+  });
+});
+
 test('uninstallHook removes from CLAUDE_CONFIG_DIR', () => {
   const home = freshHome();
   const cfgDir = path.join(home, '.claude-arco');

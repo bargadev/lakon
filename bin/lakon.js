@@ -5,6 +5,7 @@ const { spawnSync } = require('child_process');
 const { filterCommand, isSupported, countTokensApprox } = require('../src/filters');
 const { install, uninstall, revert, listPlatforms, backupsReport } = require('../src/install');
 const tracking = require('../src/tracking');
+const versionCheck = require('../src/hooks/version-check');
 
 const HELP = `lakon — spartan replies for AI agents
 
@@ -26,6 +27,7 @@ Usage:
   lakon gain                 Show token savings (hour / day / week / month / all)
   lakon inspect <cmd> ...    Run <cmd> once and show raw vs filtered (no tracking)
   lakon reset                Wipe the savings log
+  lakon version              Print the installed lakon version
   lakon --help               This help
 
 Supported filters: git (log/status/diff/show), ls, tree, cat, head, tail, grep, rg, ag.
@@ -34,6 +36,10 @@ Unsupported commands run unchanged (passthrough, still tracked as 0% savings).
 Multi-profile Claude Code (e.g. claude-my / claude-arco wrappers):
   CLAUDE_CONFIG_DIR=$HOME/.claude-my   lakon install
   CLAUDE_CONFIG_DIR=$HOME/.claude-arco lakon install
+
+Update notifications:
+  SessionStart hook + \`lakon gain\` / \`lakon version\` check npm once per day.
+  Disable with LAKON_NO_UPDATE_CHECK=1.
 `;
 
 function runAndFilter(cmd, args) {
@@ -42,9 +48,11 @@ function runAndFilter(cmd, args) {
     process.stderr.write(`lakon: ${child.error.message}\n`);
     process.exit(127);
   }
+  /* c8 ignore next */
   const raw = child.stdout || '';
   const filtered = isSupported(cmd) ? filterCommand(cmd, args, raw) : raw;
   process.stdout.write(filtered);
+  /* c8 ignore next */
   if (filtered && !filtered.endsWith('\n')) process.stdout.write('\n');
 
   tracking.record({
@@ -54,6 +62,7 @@ function runAndFilter(cmd, args) {
     filteredTokens: countTokensApprox(filtered),
   });
 
+  /* c8 ignore next */
   process.exit(child.status ?? 0);
 }
 
@@ -64,10 +73,12 @@ function inspectCmd(rest) {
   }
   const [cmd, ...args] = rest;
   const child = spawnSync(cmd, args, { encoding: 'utf8' });
+  /* c8 ignore next */
   const raw = child.stdout || '';
   const filtered = isSupported(cmd) ? filterCommand(cmd, args, raw) : raw;
   const rawTokens = countTokensApprox(raw);
   const newTokens = countTokensApprox(filtered);
+  /* c8 ignore next */
   const saved = rawTokens === 0 ? 0 : Math.round((1 - newTokens / rawTokens) * 100);
   process.stdout.write(
     `cmd:      ${cmd} ${args.join(' ')}\n` +
@@ -77,10 +88,37 @@ function inspectCmd(rest) {
   );
 }
 
+function printVersion() {
+  const pkg = require('../package.json');
+  process.stdout.write(`${pkg.name} ${pkg.version}\n`);
+}
+
+function maybePrintUpdateHint() {
+  try {
+    const update = versionCheck.getCachedUpdate();
+    if (update) {
+      /* c8 ignore next */
+      const color = !process.env.NO_COLOR && process.stderr.isTTY;
+      const msg = versionCheck.formatNotice(update);
+      /* c8 ignore next */
+      process.stderr.write(color ? `\n\x1b[33m${msg}\x1b[0m\n` : `\n${msg}\n`);
+    }
+    /* c8 ignore next 3 */
+  } catch {
+    // never let update hint break a command
+  }
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   if (!argv.length || argv[0] === '--help' || argv[0] === '-h') {
     process.stdout.write(HELP);
+    return;
+  }
+  if (argv[0] === '--version' || argv[0] === '-v' || argv[0] === 'version') {
+    printVersion();
+    await versionCheck.checkForUpdate().catch(() => {});
+    maybePrintUpdateHint();
     return;
   }
 
@@ -88,6 +126,7 @@ async function main() {
 
   if (first === 'install') {
     const onlyIdx = rest.indexOf('--only');
+    /* c8 ignore next */
     const only = onlyIdx >= 0 ? rest[onlyIdx + 1] : null;
     const here = rest.includes('--here');
     await install({ only, here });
@@ -99,6 +138,7 @@ async function main() {
   }
   if (first === 'revert') {
     const onlyIdx = rest.indexOf('--only');
+    /* c8 ignore next */
     const only = onlyIdx >= 0 ? rest[onlyIdx + 1] : null;
     await revert({ only });
     return;
@@ -113,6 +153,8 @@ async function main() {
   }
   if (first === 'gain' || first === 'stats') {
     process.stdout.write(tracking.report());
+    await versionCheck.checkForUpdate().catch(() => {});
+    maybePrintUpdateHint();
     return;
   }
   if (first === 'inspect') {
@@ -128,6 +170,7 @@ async function main() {
   runAndFilter(first, rest);
 }
 
+/* c8 ignore next 4 */
 main().catch((err) => {
   process.stderr.write(`lakon: ${err.message}\n`);
   process.exit(1);

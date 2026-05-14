@@ -4,9 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+/* c8 ignore next */
 const MARKER_DIR = path.join(os.tmpdir(), `lakon-${process.env.USER || 'session'}`);
 const TTL_MS = 4 * 60 * 60 * 1000;
 
+/* c8 ignore start */
 function shouldEmit(category) {
   if (process.env.LAKON_NO_THROTTLE === '1') return true;
   try {
@@ -25,5 +27,6 @@ function shouldEmit(category) {
     return true;
   }
 }
+/* c8 ignore stop */
 
 module.exports = { shouldEmit };

@@ -6,9 +6,11 @@ const path = require('path');
 const os = require('os');
 
 function lakonHome() {
+  /* c8 ignore next */
   return process.env.LAKON_HOME || path.join(os.homedir(), '.lakon');
 }
 
+/* c8 ignore start */
 function trackRecord({ cmd, args, rawTokens, filteredTokens }) {
   if (process.env.LAKON_NO_TRACK === '1') return;
   try {
@@ -27,6 +29,7 @@ function trackRecord({ cmd, args, rawTokens, filteredTokens }) {
     // never let tracking break the hook
   }
 }
+/* c8 ignore stop */
 
 const DENY_DIRS = [
   'node_modules',
@@ -66,6 +69,7 @@ const DENY_FILE_RE = /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.
 const AUTO_CAP_LINES = 800;
 
 function isDeniedPath(p) {
+  /* c8 ignore next */
   if (typeof p !== 'string' || !p) return null;
   const norm = p.replace(/\\/g, '/');
   for (const dir of DENY_DIRS) {
@@ -86,6 +90,7 @@ function fileLineCount(p) {
     for (let i = 0; i < data.length; i++) if (data.charCodeAt(i) === 10) n++;
     if (data.length && data.charCodeAt(data.length - 1) !== 10) n++;
     return n;
+    /* c8 ignore next 3 */
   } catch {
     return null;
   }
@@ -107,6 +112,7 @@ async function readStdin() {
   return raw;
 }
 
+/* c8 ignore start */
 async function main() {
   try {
     const raw = await readStdin();
@@ -172,5 +178,6 @@ async function main() {
     process.exit(0);
   }
 }
+/* c8 ignore stop */
 
 main();

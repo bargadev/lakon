@@ -128,3 +128,18 @@ test('survives malformed transcript lines', () => {
   assert.equal(log.length, 1);
   assert.equal(log[0].in_tokens, 5);
 });
+
+test('skips malformed line during reverse scan, keeps walking back', () => {
+  const home = freshHome();
+  const transcriptPath = path.join(home, 'mixed.jsonl');
+  fs.writeFileSync(
+    transcriptPath,
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', usage: { input_tokens: 11, output_tokens: 22 } } }) + '\n' +
+      'GARBAGE NOT JSON\n',
+    'utf8'
+  );
+  runHook({ transcript_path: transcriptPath }, home);
+  const log = readLog(home);
+  assert.equal(log.length, 1);
+  assert.equal(log[0].in_tokens, 11);
+});

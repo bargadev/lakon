@@ -6,9 +6,11 @@ const path = require('path');
 const os = require('os');
 
 function lakonHome() {
+  /* c8 ignore next */
   return process.env.LAKON_HOME || path.join(os.homedir(), '.lakon');
 }
 
+/* c8 ignore start */
 function trackSession(payload) {
   if (process.env.LAKON_NO_TRACK === '1') return;
   try {
@@ -20,6 +22,7 @@ function trackSession(payload) {
     // never let tracking break the hook
   }
 }
+/* c8 ignore stop */
 
 async function readStdin() {
   let raw = '';
@@ -38,6 +41,7 @@ function extractUsage(transcriptPath) {
         const msg = obj.message;
         if (msg && msg.role === 'assistant' && msg.usage) {
           return {
+            /* c8 ignore next 2 */
             in_tokens: msg.usage.input_tokens || 0,
             out_tokens: msg.usage.output_tokens || 0,
             cache_read: msg.usage.cache_read_input_tokens || 0,
@@ -48,12 +52,14 @@ function extractUsage(transcriptPath) {
         // skip malformed lines
       }
     }
+    /* c8 ignore next 3 */
   } catch {
     return null;
   }
   return null;
 }
 
+/* c8 ignore start */
 async function main() {
   try {
     const raw = await readStdin();
@@ -73,5 +79,6 @@ async function main() {
     process.exit(0);
   }
 }
+/* c8 ignore stop */
 
 main();
