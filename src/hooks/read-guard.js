@@ -3,6 +3,30 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+
+function lakonHome() {
+  return process.env.LAKON_HOME || path.join(os.homedir(), '.lakon');
+}
+
+function trackRecord({ cmd, args, rawTokens, filteredTokens }) {
+  if (process.env.LAKON_NO_TRACK === '1') return;
+  try {
+    const dir = lakonHome();
+    fs.mkdirSync(dir, { recursive: true });
+    const entry = {
+      t: Date.now(),
+      cmd,
+      args: Array.isArray(args) ? args.slice(0, 4) : [],
+      raw: rawTokens,
+      out: filteredTokens,
+      saved: Math.max(0, rawTokens - filteredTokens),
+    };
+    fs.appendFileSync(path.join(dir, 'log.jsonl'), JSON.stringify(entry) + '\n');
+  } catch {
+    // never let tracking break the hook
+  }
+}
 
 const DENY_DIRS = [
   'node_modules',
@@ -50,6 +74,15 @@ function fileLineCount(p) {
   }
 }
 
+function estimateTokensByBytes(p) {
+  try {
+    const size = fs.statSync(p).size;
+    return Math.max(1, Math.round(size / 4));
+  } catch {
+    return 0;
+  }
+}
+
 async function readStdin() {
   let raw = '';
   process.stdin.setEncoding('utf8');
@@ -70,6 +103,13 @@ async function main() {
 
     const denyReason = isDeniedPath(fp);
     if (denyReason) {
+      const rawTokens = estimateTokensByBytes(fp);
+      trackRecord({
+        cmd: 'Read',
+        args: [fp, 'deny'],
+        rawTokens,
+        filteredTokens: 0,
+      });
       const response = {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
@@ -84,6 +124,15 @@ async function main() {
     if (input.limit == null && input.offset == null) {
       const n = fileLineCount(fp);
       if (n !== null && n > AUTO_CAP_LINES) {
+        const rawTokens = estimateTokensByBytes(fp);
+        const capRatio = AUTO_CAP_LINES / n;
+        const filteredTokens = Math.round(rawTokens * capRatio);
+        trackRecord({
+          cmd: 'Read',
+          args: [fp, 'cap'],
+          rawTokens,
+          filteredTokens,
+        });
         const response = {
           hookSpecificOutput: {
             hookEventName: 'PreToolUse',

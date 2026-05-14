@@ -9,10 +9,13 @@ const os = require('node:os');
 
 const HOOK = path.join(__dirname, '..', 'src', 'hooks', 'read-guard.js');
 
+const TEST_LAKON_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'lakon-test-'));
+
 function runHook(input) {
   const res = spawnSync('node', [HOOK], {
     input: JSON.stringify(input),
     encoding: 'utf8',
+    env: { ...process.env, LAKON_HOME: TEST_LAKON_HOME },
   });
   return res.stdout.trim();
 }
