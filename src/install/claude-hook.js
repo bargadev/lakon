@@ -4,11 +4,23 @@ const fs = require('fs');
 const path = require('path');
 const { backupFile } = require('./backup');
 
-const HOOK_BASENAME = 'lakon-bash-rewrite.js';
-const HOOK_SRC = path.join(__dirname, '..', 'hooks', 'bash-rewrite.js');
+const HOOKS = [
+  {
+    basename: 'lakon-bash-rewrite.js',
+    src: path.join(__dirname, '..', 'hooks', 'bash-rewrite.js'),
+    matcher: 'Bash',
+  },
+  {
+    basename: 'lakon-read-guard.js',
+    src: path.join(__dirname, '..', 'hooks', 'read-guard.js'),
+    matcher: 'Read',
+  },
+];
 
-function hookDest(home) {
-  return path.join(home, '.claude', 'hooks', HOOK_BASENAME);
+const ALL_BASENAMES = HOOKS.map((h) => h.basename);
+
+function hookDest(home, basename) {
+  return path.join(home, '.claude', 'hooks', basename);
 }
 
 function settingsPath(home) {
@@ -29,54 +41,61 @@ function writeSettings(home, data) {
   fs.writeFileSync(settingsPath(home), JSON.stringify(data, null, 2) + '\n', 'utf8');
 }
 
-function hasOurHook(entry) {
+function entryHasHook(entry, basename) {
   if (!entry || !Array.isArray(entry.hooks)) return false;
-  return entry.hooks.some((h) => h && typeof h.command === 'string' && h.command.includes(HOOK_BASENAME));
+  return entry.hooks.some((h) => h && typeof h.command === 'string' && h.command.includes(basename));
 }
 
-function installHook(home) {
-  const dest = hookDest(home);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(HOOK_SRC, dest);
-  fs.chmodSync(dest, 0o755);
-
-  const sp = settingsPath(home);
-  if (fs.existsSync(sp)) backupFile('claude-code', sp);
-
-  const { ok, data, error } = readSettings(home);
-  if (!ok) {
-    return { hookFile: dest, settingsMerged: false, note: `settings.json could not be parsed (${error}). Add the hook entry manually — see README.` };
-  }
-
+function mergeHook(data, hookDef, dest) {
   data.hooks = data.hooks || {};
   data.hooks.PreToolUse = data.hooks.PreToolUse || [];
 
-  const existing = data.hooks.PreToolUse.find((e) => e.matcher === 'Bash');
+  const existing = data.hooks.PreToolUse.find((e) => e.matcher === hookDef.matcher);
   if (existing) {
-    if (!hasOurHook(existing)) {
+    if (!entryHasHook(existing, hookDef.basename)) {
       existing.hooks = existing.hooks || [];
       existing.hooks.push({ type: 'command', command: dest });
     }
   } else {
     data.hooks.PreToolUse.push({
-      matcher: 'Bash',
+      matcher: hookDef.matcher,
       hooks: [{ type: 'command', command: dest }],
     });
   }
+}
+
+function installHook(home) {
+  const sp = settingsPath(home);
+  if (fs.existsSync(sp)) backupFile('claude-code', sp);
+
+  const { ok, data, error } = readSettings(home);
+  if (!ok) {
+    return { hookFile: null, settingsMerged: false, note: `settings.json could not be parsed (${error}). Add hook entries manually — see README.` };
+  }
+
+  const installed = [];
+  for (const h of HOOKS) {
+    const dest = hookDest(home, h.basename);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(h.src, dest);
+    fs.chmodSync(dest, 0o755);
+    mergeHook(data, h, dest);
+    installed.push(dest);
+  }
 
   writeSettings(home, data);
-  return { hookFile: dest, settingsMerged: true };
+  return { hookFile: installed.join(', '), settingsMerged: true };
 }
 
 function uninstallHook(home) {
-  const dest = hookDest(home);
-
   const { ok, data } = readSettings(home);
   if (ok && data.hooks && Array.isArray(data.hooks.PreToolUse)) {
     data.hooks.PreToolUse = data.hooks.PreToolUse
       .map((entry) => {
-        if (entry.matcher !== 'Bash' || !Array.isArray(entry.hooks)) return entry;
-        const remaining = entry.hooks.filter((h) => !(h.command && h.command.includes(HOOK_BASENAME)));
+        if (!Array.isArray(entry.hooks)) return entry;
+        const remaining = entry.hooks.filter(
+          (h) => !(h.command && ALL_BASENAMES.some((b) => h.command.includes(b)))
+        );
         if (remaining.length === 0) return null;
         return { ...entry, hooks: remaining };
       })
@@ -86,9 +105,12 @@ function uninstallHook(home) {
     if (fs.existsSync(settingsPath(home))) writeSettings(home, data);
   }
 
-  if (fs.existsSync(dest)) {
-    try { fs.unlinkSync(dest); } catch {}
+  for (const h of HOOKS) {
+    const dest = hookDest(home, h.basename);
+    if (fs.existsSync(dest)) {
+      try { fs.unlinkSync(dest); } catch {}
+    }
   }
 }
 
-module.exports = { installHook, uninstallHook, hookDest, HOOK_BASENAME };
+module.exports = { installHook, uninstallHook, hookDest, HOOK_BASENAMES: ALL_BASENAMES };

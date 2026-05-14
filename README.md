@@ -5,11 +5,11 @@
 <h1 align="center">lakon</h1>
 
 <p align="center">
-  <strong>Spartan replies for AI agents.</strong>
+  <strong>Cut LLM tokens by up to 94% — without losing a single identifier.</strong>
 </p>
 
 <p align="center">
-  <em>Less words. Win wars.</em>
+  <em>Spartan replies for AI agents. Less words. Win wars.</em>
 </p>
 
 <p align="center">
@@ -17,7 +17,28 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0F0F0F" alt="MIT" /></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A518-0F0F0F" alt="node ≥18" />
   <img src="https://img.shields.io/badge/deps-0-0F0F0F" alt="zero dependencies" />
+  <img src="https://img.shields.io/badge/agents-6-0F0F0F" alt="6 AI agents" />
 </p>
+
+<p align="center">
+  One command. <strong>Three fronts</strong>: terse model output · filtered shell output · blocked junk reads.<br/>
+  Works across <strong>Claude Code, Codex, Cursor, Windsurf, Cline, Gemini CLI</strong>.
+</p>
+
+---
+
+## At a glance — measured savings
+
+| Command                          | Raw tokens | Filtered | Saved   |
+|----------------------------------|-----------:|---------:|--------:|
+| `git log -50`                    |      1,859 |      173 | **-91%** |
+| `git diff HEAD~5`                |      7,965 |    2,523 | **-68%** |
+| `ls -la` (large dir)             |        317 |       70 | **-78%** |
+| `grep -rn function src/`         |        287 |       62 | **-78%** |
+| `git status`                     |         57 |       18 | **-68%** |
+| `Read node_modules/lodash.js`    |     ~5,000 |    **blocked** | **-100%** |
+
+Real numbers from this repo. Run `lakon inspect <cmd>` on your own commands.
 
 ---
 
@@ -39,21 +60,15 @@ Your AI coding agent does. It opens with *"Sure! I'd be happy to help…"*, repe
 
 ---
 
-## What it does
+## Three fronts. One install.
 
-| Front                       | Wasted tokens look like…                          | lakon fixes it by…                                    |
-|-----------------------------|----------------------------------------------------|-------------------------------------------------------|
-| **Output side** (the model) | *"Great question! Let me explain…"*                | Installing a terse-response rule into your agent's config |
-| **Input side** (your tools) | `git log` dumping 1.8 k tokens of author metadata  | Wrapping shell commands and compressing output before it enters context |
+| Front                          | Wasted tokens look like…                              | lakon fixes it by…                                                                  |
+|--------------------------------|-------------------------------------------------------|-------------------------------------------------------------------------------------|
+| **Output** (the model)         | *"Great question! Let me explain…"*                   | Installing a terse-response rule. No preamble, no recap, no restating.              |
+| **Input** (your shell tools)   | `git log` dumping 1.8 k tokens of author metadata     | Wrapping `git`/`ls`/`grep`/`cat`/`tree`/`head`/`tail` and compressing before context. |
+| **Reads** (file ingestion)     | Agent runs `Read` on `pnpm-lock.yaml` → 80 k of nothing | A `PreToolUse` hook on `Read` blocks lockfiles & `node_modules`, caps files >800 lines. |
 
-Measured savings on real commands (this repo, today):
-
-```
-git log -50           1859 →  173 tokens     -91 %
-git diff HEAD~5       7965 → 2523 tokens     -68 %
-ls -la                 317 →   70 tokens     -78 %
-git status              57 →   18 tokens     -68 %
-```
+Other tools stop at one front. lakon does all three transparently — your agent doesn't have to remember anything.
 
 ---
 
@@ -66,12 +81,13 @@ lakon install
 
 That's it. `lakon install` auto-detects which AI tools you have (Claude Code, Codex, Cursor, Windsurf, Cline, Gemini CLI) and configures each. From the next session forward your agent:
 
-1. **Responds tersely** — no preamble, no restating, no recap. (rule in CLAUDE.md / equivalent)
-2. **Has its `Bash` calls auto-rewritten** to use the filter — for Claude Code, a `PreToolUse` hook intercepts `git`/`ls`/`cat`/`grep`/etc and prefixes them with `lakon` transparently, so the model doesn't have to remember.
+1. **Responds tersely** — no preamble, no restating, no recap. (rule in `CLAUDE.md` / equivalent)
+2. **Has its `Bash` calls auto-rewritten** — `PreToolUse` hook intercepts `git`/`ls`/`cat`/`grep`/etc and prefixes them with `lakon` transparently.
+3. **Has its `Read` calls guarded** — a second hook denies `node_modules/`, lockfiles, and build artifacts (with a hint to `grep` instead), and auto-caps reads over 800 lines.
 
 You'll see savings stack up immediately in `lakon gain`.
 
-> The hook is currently Claude Code-only (it's the only platform with a documented `PreToolUse` API). For Codex/Cursor/Windsurf/Cline/Gemini, the rule asks the model to use the `lakon` prefix itself.
+> Both hooks are currently Claude Code-only (the only platform with a documented `PreToolUse` API). For Codex/Cursor/Windsurf/Cline/Gemini, the rule asks the model to grep-before-Read and use the `lakon` prefix itself.
 
 > **Worried?** Every install backs up the target file first. `lakon revert` puts it back byte-for-byte.
 
@@ -152,16 +168,28 @@ saved:    85%
 
 ## Supported filters
 
-| Command                | What it does                                              |
-|------------------------|-----------------------------------------------------------|
-| `git log`              | One line per commit (`<hash> <subject>`)                  |
-| `git status`           | Drops hint paragraphs, separates changed vs untracked     |
-| `git diff` / `show`    | Only `+`/`-`/`@@` lines, drops `index`/`---`/`+++`        |
-| `ls -la` / `tree`      | `<size>\t<name>` (drops perms / dates / link targets)     |
-| `cat` / `head` / `tail`| Truncates at 500 / 100 / 100 lines                        |
-| `grep` / `rg` / `ag`   | Truncates at 40 matches                                   |
+| Command                | What it does                                                      |
+|------------------------|-------------------------------------------------------------------|
+| `git log`              | One line per commit (`<hash> <subject>`), capped at 50            |
+| `git status`           | Drops hint paragraphs, separates changed vs untracked             |
+| `git diff` / `show`    | Only `+`/`-`/`@@` lines, drops `index`/`---`/`+++`, cap 120 lines |
+| `ls -la` / `tree`      | `<size>\t<name>` (drops perms / dates / link targets), cap 60     |
+| `cat`                  | Collapses blank-line runs, cap 200 lines                          |
+| `head` / `tail`        | Cap 50 lines                                                      |
+| `grep` / `rg` / `ag`   | Cap 15 matches with "tighten the pattern" hint                    |
 
 Unsupported commands run unchanged (passthrough), still tracked at 0 % savings.
+
+### Read tool guard (Claude Code)
+
+The `Read` hook automatically:
+
+- **Denies** paths under `node_modules/`, `vendor/`, `dist/`, `build/`, `.next/`, `.turbo/`, `coverage/`, `__pycache__/`, `.venv/`, `.git/objects/`
+- **Denies** lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `*.lock`)
+- **Denies** build artifacts (`*.min.js`, `*.min.css`, `*.tsbuildinfo`, `*.map`, `*.log`)
+- **Caps** files over 800 lines at 800 (with hint to `Read` again with `offset` for more, or `grep -n` for the symbol you need)
+
+Each deny returns a one-line reason the model reads, so it knows to `grep -n` the symbol instead.
 
 ---
 
@@ -169,12 +197,12 @@ Unsupported commands run unchanged (passthrough), still tracked at 0 % savings.
 
 | Agent        | What `lakon install` writes                                                                          |
 |--------------|------------------------------------------------------------------------------------------------------|
-| Claude Code  | Block in `~/.claude/CLAUDE.md` + `PreToolUse` hook in `~/.claude/settings.json` (auto-rewrites Bash) |
-| Codex CLI    | Block in `~/.codex/AGENTS.md`                                                                        |
+| Claude Code  | Rule block in `~/.claude/CLAUDE.md` + **two** `PreToolUse` hooks in `~/.claude/settings.json` (Bash rewrite + Read guard) |
+| Codex CLI    | Rule block in `~/.codex/AGENTS.md`                                                                   |
 | Cursor       | `.cursor/rules/lakon.mdc` in the current repo                                                        |
 | Windsurf     | `.windsurf/rules/lakon.md` in the current repo                                                       |
 | Cline        | `.clinerules/lakon.md` in the current repo                                                           |
-| Gemini CLI   | Block in `~/.gemini/GEMINI.md`                                                                       |
+| Gemini CLI   | Rule block in `~/.gemini/GEMINI.md`                                                                  |
 
 Each install is **idempotent** (rerunning replaces the existing block) and **reversible** (`uninstall` strips it, `revert` restores from backup).
 

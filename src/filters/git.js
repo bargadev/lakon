@@ -77,7 +77,7 @@ function filterDiff(raw) {
       out.push(line);
     }
   }
-  return truncateLines(out.join('\n'), 200);
+  return truncateLines(out.join('\n'), 120);
 }
 
 function filter(subcmd, raw) {

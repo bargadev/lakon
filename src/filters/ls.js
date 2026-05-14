@@ -18,7 +18,7 @@ function filterLong(raw) {
       out.push(line);
     }
   }
-  return truncateLines(out.join('\n'), 100);
+  return truncateLines(out.join('\n'), 60);
 }
 
 function filter(raw) {
@@ -27,7 +27,7 @@ function filter(raw) {
   if (LONG_FORMAT_RE.test(firstReal)) {
     return filterLong(text);
   }
-  return truncateLines(text, 100);
+  return truncateLines(text, 60);
 }
 
 module.exports = { filter, filterLong };

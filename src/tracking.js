@@ -89,6 +89,10 @@ function fmt(n) {
   return String(n);
 }
 
+function tok(n) {
+  return fmt(n) + ' tok';
+}
+
 function report() {
   const entries = readEntries();
   if (!entries.length) {
@@ -105,15 +109,15 @@ function report() {
   const lines = [];
   lines.push('lakon — savings report');
   lines.push('───────────────────────────────────────────────────────────');
-  lines.push('window      calls    raw       filtered   saved      %');
+  lines.push('window      calls    before       after        saved       %');
   lines.push('───────────────────────────────────────────────────────────');
   for (const [label, agg] of buckets) {
     const row =
       `${label}` +
       `${String(agg.calls).padStart(6)}  ` +
-      `${fmt(agg.raw).padStart(8)}  ` +
-      `${fmt(agg.out).padStart(8)}   ` +
-      `${fmt(agg.saved).padStart(8)}   ` +
+      `${tok(agg.raw).padStart(10)}  ` +
+      `${tok(agg.out).padStart(10)}   ` +
+      `${tok(agg.saved).padStart(10)}   ` +
       `${pct(agg.saved, agg.raw).toString().padStart(3)}%`;
     lines.push(row);
   }
@@ -124,7 +128,7 @@ function report() {
     lines.push('');
     lines.push('top commands (all time):');
     for (const c of top) {
-      lines.push(`  ${c.cmd.padEnd(8)} calls=${c.calls}  saved=${fmt(c.saved)}  ${pct(c.saved, c.raw)}%`);
+      lines.push(`  ${c.cmd.padEnd(8)} calls=${c.calls}  saved=${tok(c.saved)}  ${pct(c.saved, c.raw)}%`);
     }
   }
 

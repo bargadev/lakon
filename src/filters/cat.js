@@ -2,11 +2,17 @@
 
 const { stripAnsi, truncateLines } = require('./utils');
 
-const DEFAULT_MAX_LINES = 500;
+const DEFAULT_MAX_LINES = 200;
+const BLANK_RUN_RE = /\n[\t ]*\n([\t ]*\n)+/g;
+
+function compactBlankRuns(text) {
+  return text.replace(BLANK_RUN_RE, '\n\n');
+}
 
 function filter(raw, opts = {}) {
   const max = opts.maxLines || DEFAULT_MAX_LINES;
-  return truncateLines(stripAnsi(raw), max);
+  const compacted = compactBlankRuns(stripAnsi(raw));
+  return truncateLines(compacted, max);
 }
 
-module.exports = { filter };
+module.exports = { filter, compactBlankRuns };

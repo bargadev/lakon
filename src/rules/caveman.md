@@ -61,3 +61,17 @@ Unsupported commands run unchanged through `lakon`, so when in doubt, prefix it.
 - The user explicitly asks for raw, unfiltered output.
 - You're piping into another command (`git log | head` — pipe `lakon git log | head` instead).
 - You need a specific format the filter would strip (e.g. machine-parseable `git log --format=...`).
+
+## File reads — grep first, then Read with offset/limit
+
+Reading entire files is the single biggest token sink. Before using `Read` on any file:
+
+1. **Don't Read what you don't need.** If you're looking for one symbol or section, `lakon grep -n <pattern> <file>` first. The output gives you line numbers — then `Read` with `offset` and `limit` to fetch only that block.
+2. **Never Read these — grep them or skip:**
+   - `node_modules/**`, `vendor/**`, `dist/**`, `build/**`, `.next/**`, `.turbo/**`, `coverage/**`
+   - Lockfiles: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `*.lock`
+   - Build artifacts: `*.tsbuildinfo`, `*.min.js`, `*.min.css`, source maps, log files
+3. **For files > 300 lines:** start with `lakon grep -n` to locate, then `Read` a slice. Don't `Read` a 2000-line file to find one function.
+4. **Use `Glob` to find files**, not `Read` on the directory listing.
+
+These reads cost real context. A `node_modules` peek is 50k tokens of nothing.

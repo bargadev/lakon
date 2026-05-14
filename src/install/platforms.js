@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { backupFile, restoreAllBackups } = require('./backup');
 const { installHook, uninstallHook } = require('./claude-hook');
+const { installCommands, uninstallCommands } = require('./claude-commands');
 
 const MARK_BEGIN = '<!-- lakon:begin -->';
 const MARK_END = '<!-- lakon:end -->';
@@ -67,12 +68,14 @@ const PLATFORMS = [
     install: ({ home, rule, id }) => {
       const rulePath = upsertBlock(id, path.join(home, '.claude', 'CLAUDE.md'), rule);
       const hookResult = installHook(home);
-      return hookResult.settingsMerged
-        ? `${rulePath} + PreToolUse hook`
-        : `${rulePath} (hook: ${hookResult.note})`;
+      const cmds = installCommands(home);
+      const suffixHook = hookResult.settingsMerged ? '+ PreToolUse hook' : `(hook: ${hookResult.note})`;
+      const suffixCmds = cmds.length ? `+ ${cmds.join(' ')}` : '';
+      return [rulePath, suffixHook, suffixCmds].filter(Boolean).join(' ');
     },
     uninstall: ({ home }) => {
       uninstallHook(home);
+      uninstallCommands(home);
       return stripBlock(path.join(home, '.claude', 'CLAUDE.md'));
     },
   },
