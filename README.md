@@ -22,6 +22,7 @@
 
 <p align="center">
   One command. <strong>Three fronts</strong>: terse model output · filtered shell output · blocked junk reads.<br/>
+  Plus session-level token tracking and one-day update notifications.<br/>
   Works across <strong>Claude Code, Codex, Cursor, Windsurf, Cline, Gemini CLI</strong>.
 </p>
 
@@ -98,10 +99,12 @@ From the next session forward your agent:
 3. **Has its `Read` calls guarded** — a second hook denies `node_modules/`, lockfiles, and build artifacts (with a hint to `grep` instead), and auto-caps reads over 800 lines.
 4. **Has its `Grep` calls capped** — a third hook auto-sets `head_limit` to 30 if you didn't, with a once-per-session hint to use `output_mode:"count"` for tallies.
 5. **Is told to "think in code"** — for any count/filter/parse task, the rule pushes the agent toward a one-shot `node -e` (or `awk`) script that consumes the data so the agent consumes only the answer.
+6. **Logs per-turn LLM token usage** — a `Stop` hook records `input_tokens` / `output_tokens` / `cache_read` after each model turn so `lakon gain` shows model-side savings alongside shell-side savings.
+7. **Tells you about new versions** — a `SessionStart` hook checks npm once per day and surfaces a `lakon X.Y.Z available` notice inside the session (opt-out: `LAKON_NO_UPDATE_CHECK=1`).
 
 You'll see savings stack up immediately in `lakon gain`.
 
-> Both hooks are currently Claude Code-only (the only platform with a documented `PreToolUse` API). For Codex/Cursor/Windsurf/Cline/Gemini, the rule asks the model to grep-before-Read and use the `lakon` prefix itself.
+> Hooks are currently Claude Code-only (the only platform with documented hook APIs). For Codex/Cursor/Windsurf/Cline/Gemini, the rule asks the model to grep-before-Read and use the `lakon` prefix itself.
 
 > **Worried?** Every install backs up the target file first. `lakon revert` puts it back byte-for-byte.
 
@@ -130,22 +133,29 @@ lakon gain
 ```
 
 ```
-lakon — savings report
-───────────────────────────────────────────────────────────
-window      calls    raw       filtered   saved      %
-───────────────────────────────────────────────────────────
-last hour     12      1.2k      380       820      68%
-last 24h      87      9.8k     3.1k      6.7k      68%
-last 7d      512     54.2k    17.8k     36.4k      67%
-last 30d    2104    241.0k    79.2k    161.8k      67%
-all time    2104    241.0k    79.2k    161.8k      67%
-───────────────────────────────────────────────────────────
+lakon  — savings this week:  36.4k tok saved across 512 shell calls (67%)
 
-top commands (all time):
-  git      calls=812  saved=124.3k  72%
-  ls       calls=541  saved=18.2k   58%
-  grep     calls=339  saved=12.0k   65%
+shell + read/grep guards  (tokens filtered before context)
+  win    calls       before          after          saved       %
+  1h       12      1.2k tok       380 tok        820 tok   68%
+  24h      87      9.8k tok      3.1k tok       6.7k tok   68%
+  7d      512     54.2k tok     17.8k tok      36.4k tok   67%
+  30d    2104    241.0k tok     79.2k tok     161.8k tok   67%
+  all    2104    241.0k tok     79.2k tok     161.8k tok   67%
+
+llm output  (model tokens — terse style trims this side)
+  win    turns       input         output          cache-read
+  1h        4       2.1k tok       320 tok      48.7k tok
+  24h      38      18.4k tok      2.6k tok     412.2k tok
+  7d      210     102.5k tok     14.1k tok     2.3M tok
+
+top commands  (all time)
+  git       812x   saved 124.3k tok  72%
+  ls        541x   saved  18.2k tok  58%
+  grep      339x   saved  12.0k tok  65%
 ```
+
+The top block measures **input savings** (what filtered shell + guards prevented from entering context). The `llm output` block measures **model-side activity** so you can see verbosity dropping over time (and cache hits climbing). Set `LAKON_COLOR=1`/`0` (or `NO_COLOR=1`) to force/disable ANSI colors when piping.
 
 ### Inspect a single command
 
@@ -174,9 +184,10 @@ saved:    85%
 | `lakon backups`                  | Show backup history per platform                                      |
 | `lakon list`                     | Show supported platforms and which are detected                       |
 | `lakon <cmd> [args]`             | Run a command, filter its output, track savings                       |
-| `lakon gain`                     | Show savings by hour / day / week / month / all-time                  |
+| `lakon gain`                     | Show savings by hour / day / week / month / all-time + session totals |
 | `lakon inspect <cmd>`            | Run once and show raw-vs-filtered (no tracking)                       |
 | `lakon reset`                    | Wipe the savings log                                                  |
+| `lakon version` / `--version` / `-v` | Print the installed lakon version                                 |
 
 `lak` is the short alias for `lakon` — same behavior.
 
@@ -211,13 +222,43 @@ Each deny returns a one-line reason the model reads, so it knows to `grep -n` th
 
 The `Grep` hook auto-sets `head_limit` to **30** when the agent didn't pass one. First call per 4-hour window includes a one-line hint suggesting `output_mode:"count"` for tallies; subsequent calls cap silently.
 
+### Session output tracking (Claude Code)
+
+A `Stop` hook fires at the end of every model turn, reads the latest `usage` block from the transcript, and appends a `cmd: "session"` entry to the log with `input_tokens`, `output_tokens`, `cache_read_input_tokens`, and `cache_creation_input_tokens`.
+
+`lakon gain` renders these in a separate **session output** block (see example above) — so you can watch model-side verbosity drop and cache-hit ratios climb over time. Top commands list excludes session entries; they're not shell calls.
+
+### Update notifications (Claude Code)
+
+A `SessionStart` hook checks `registry.npmjs.org/@bargadev/lakon/latest` at most once per 24 hours (cached at `~/.lakon/version.json`) and, if a newer version exists, emits a `hookSpecificOutput.additionalContext` that surfaces inside the Claude session:
+
+```
+lakon 0.7.0 available (you have 0.6.0). Update: npm i -g @bargadev/lakon@latest
+```
+
+Outside Claude, `lakon gain` and `lakon version` print the same notice on stderr (yellow when TTY).
+
+**Opt out:** `LAKON_NO_UPDATE_CHECK=1`.
+**Test endpoint:** `LAKON_REGISTRY_URL=http://localhost:8080/` (overrides the npm URL for local testing).
+
+### Multi-profile Claude Code
+
+If you use wrapper aliases like `claude-my=CLAUDE_CONFIG_DIR=$HOME/.claude-my claude` (e.g. one profile per Anthropic account or org), set the same env var when running `lakon install` so hooks and the rule file land in the right config dir:
+
+```bash
+CLAUDE_CONFIG_DIR=$HOME/.claude-my   lakon install
+CLAUDE_CONFIG_DIR=$HOME/.claude-arco lakon install
+```
+
+Each profile gets its own independent install. `lakon uninstall` / `lakon revert` respect the same env var.
+
 ---
 
 ## Supported AI agents
 
 | Agent           | Scope    | What `lakon install` writes                                                                          |
 |-----------------|----------|------------------------------------------------------------------------------------------------------|
-| Claude Code¹    | global   | Rule block in `~/.claude/CLAUDE.md` + **three** `PreToolUse` hooks in `~/.claude/settings.json` (Bash rewrite + Read guard + Grep guard) |
+| Claude Code¹    | global   | Rule block in `~/.claude/CLAUDE.md` + **five** hooks in `~/.claude/settings.json` (`PreToolUse`: Bash rewrite + Read guard + Grep guard; `Stop`: session-usage log; `SessionStart`: update notify) + `/lakon:gain` `/lakon:reset` `/lakon:inspect` slash commands |
 | Codex CLI       | global   | Rule block in `~/.codex/AGENTS.md`                                                                   |
 | Gemini CLI      | global   | Rule block in `~/.gemini/GEMINI.md`                                                                  |
 | Cursor          | project² | `.cursor/rules/lakon.mdc` in the current dir                                                         |
@@ -248,20 +289,25 @@ Use `uninstall` to remove lakon while keeping your other edits. Use `revert` whe
 
 ## How tracking works
 
-Every filtered command appends a JSON line to `~/.lakon/log.jsonl`. `lakon gain` reads that log and aggregates by time window.
+Every filtered command appends a JSON line to `~/.lakon/log.jsonl`. The `Stop` hook appends one line per model turn with token counts (`cmd: "session"`). `lakon gain` reads that log and renders both sides separately.
 
-The log stores: timestamp, command name, first few args, raw/filtered token counts. **No file contents. No full arguments. No data ever leaves your machine.**
+The log stores: timestamp, command name, first few args, raw/filtered token counts (shell entries); timestamp, session id, `input_tokens` / `output_tokens` / `cache_read` / `cache_create` (session entries). **No file contents. No full arguments. No transcript content. No data ever leaves your machine** — except the one daily HEAD request to `registry.npmjs.org` for the update check (opt-out: `LAKON_NO_UPDATE_CHECK=1`).
 
-Override the location with `LAKON_HOME=/path`. Disable tracking entirely with `LAKON_NO_TRACK=1`.
+Override the location with `LAKON_HOME=/path`. Disable per-command logging with `LAKON_NO_TRACK=1`.
 
 ---
 
 ## Configuration
 
-| Env var          | Effect                                                |
-|------------------|-------------------------------------------------------|
-| `LAKON_HOME`     | Where to keep the log + backups (default `~/.lakon`)  |
-| `LAKON_NO_TRACK` | Set to `1` to disable per-command logging             |
+| Env var                 | Effect                                                                      |
+|-------------------------|-----------------------------------------------------------------------------|
+| `LAKON_HOME`            | Where to keep the log + backups + version cache (default `~/.lakon`)         |
+| `LAKON_NO_TRACK`        | Set to `1` to disable per-command logging                                    |
+| `LAKON_NO_UPDATE_CHECK` | Set to `1` to disable the `SessionStart` npm check + terminal hint           |
+| `LAKON_REGISTRY_URL`    | Override the npm registry URL used by the update check (testing)             |
+| `LAKON_COLOR`           | `1` forces ANSI colors in `lakon gain`; `0` disables; unset = TTY auto-detect |
+| `NO_COLOR`              | Standard. Disables ANSI colors when set to any non-empty value.              |
+| `CLAUDE_CONFIG_DIR`     | When set during `lakon install` / `uninstall`, hooks + rule land in that dir instead of `~/.claude/`. Used for multi-profile setups. |
 
 ---
 
@@ -278,13 +324,16 @@ Every token your agent emits or reads is paid for — in latency, in money, in c
 ## Development
 
 ```bash
-git clone https://github.com/bargadev/lakon
-cd lakon
-node --test tests/
+git clone https://github.com/bargadev/lakon-lib
+cd lakon-lib
+npm install                       # only devDeps (c8 for coverage); zero runtime deps
+node --test tests/                # run the suite
+npm run test:coverage             # text + HTML coverage report (coverage/index.html)
+npm run test:coverage:check       # fail if any metric drops below 100%
 node bin/lakon.js --help
 ```
 
-No dependencies. Node ≥ 18.
+Suite: **187 tests**. Coverage gate: **100% lines / 100% branches / 100% functions / 100% statements**. Zero runtime dependencies. Node ≥ 18.
 
 ---
 
